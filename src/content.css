@@ -1,49 +1,51 @@
 /* ═══════════════════════════════════════════════
    ChatGPT History Locator v4 — Tree UI
+   ChatGPT-inspired Design Language
    ═══════════════════════════════════════════════ */
 
 :root {
-  /* ── Surface ── */
-  --cghl-bg: #0d1117;
-  --cghl-bg-raised: #161b22;
-  --cghl-bg-hover: rgba(177, 186, 196, 0.06);
-  --cghl-bg-active: rgba(56, 139, 253, 0.08);
-  --cghl-bg-current: rgba(56, 139, 253, 0.16);
+  /* ── Surface (ChatGPT warm dark) ── */
+  --cghl-bg: #212121;
+  --cghl-bg-raised: #2f2f2f;
+  --cghl-bg-hover: rgba(255, 255, 255, 0.04);
+  --cghl-bg-active: rgba(16, 163, 127, 0.06);
+  --cghl-bg-current: rgba(16, 163, 127, 0.12);
 
-  /* ── Text ── */
-  --cghl-text: #e6edf3;
-  --cghl-text-secondary: rgba(201, 209, 217, 0.88);
-  --cghl-text-dim: rgba(139, 148, 158, 0.72);
-  --cghl-text-muted: rgba(110, 118, 129, 0.52);
+  /* ── Text (warm neutrals) ── */
+  --cghl-text: #ececec;
+  --cghl-text-secondary: rgba(236, 236, 236, 0.82);
+  --cghl-text-dim: rgba(180, 180, 180, 0.72);
+  --cghl-text-muted: rgba(142, 142, 142, 0.62);
 
-  /* ── Accent ── */
-  --cghl-accent: #58a6ff;
-  --cghl-accent-fg: #388bfd;
+  /* ── Accent (ChatGPT teal/green) ── */
+  --cghl-accent: #10a37f;
+  --cghl-accent-fg: #19c37d;
+  --cghl-accent-soft: rgba(16, 163, 127, 0.15);
+  --cghl-accent-glow: rgba(25, 195, 125, 0.25);
 
   /* ── Tree lines ── */
-  --cghl-line: rgba(48, 54, 61, 0.75);
-  --cghl-line-active: rgba(56, 139, 253, 0.45);
+  --cghl-line: rgba(255, 255, 255, 0.08);
+  --cghl-line-active: rgba(16, 163, 127, 0.35);
 
   /* ── Dots ── */
-  --cghl-dot-fill: rgba(48, 54, 61, 0.5);
-  --cghl-dot-stroke: rgba(110, 118, 129, 0.55);
-  --cghl-dot-active: #58a6ff;
-  --cghl-dot-current: #79c0ff;
+  --cghl-dot-fill: rgba(255, 255, 255, 0.06);
+  --cghl-dot-stroke: rgba(255, 255, 255, 0.16);
+  --cghl-dot-active: #10a37f;
+  --cghl-dot-current: #19c37d;
 
   /* ── Borders / Shadows ── */
-  --cghl-border: rgba(48, 54, 61, 0.8);
-  --cghl-border-subtle: rgba(48, 54, 61, 0.35);
-  --cghl-shadow: 0 16px 48px rgba(1, 4, 9, 0.55);
+  --cghl-border: rgba(255, 255, 255, 0.08);
+  --cghl-border-subtle: rgba(255, 255, 255, 0.05);
+  --cghl-shadow: 0 16px 56px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
 
   /* ── Chips ── */
-  --cghl-chip-bg: rgba(56, 139, 253, 0.08);
-  --cghl-chip-border: rgba(56, 139, 253, 0.2);
-  --cghl-chip-active-bg: rgba(56, 139, 253, 0.22);
-  --cghl-chip-active-border: rgba(56, 139, 253, 0.5);
+  --cghl-chip-bg: rgba(16, 163, 127, 0.08);
+  --cghl-chip-border: rgba(16, 163, 127, 0.18);
+  --cghl-chip-active-bg: rgba(16, 163, 127, 0.18);
+  --cghl-chip-active-border: rgba(16, 163, 127, 0.4);
 
   /* ── Layout constants ── */
   --cghl-guide-w: 20px;
-  --cghl-connector-y: 9px;
 
   /* ── Per-row guide colour (overridden on active rows) ── */
   --gline: var(--cghl-line);
@@ -72,10 +74,11 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans",
-    Helvetica, Arial, sans-serif;
+  font-family: "Söhne", "ui-sans-serif", "system-ui", -apple-system,
+    "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
 }
 
 /* ── Launcher button ───────────────────────────── */
@@ -84,33 +87,33 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border: 1px solid var(--cghl-border);
-  border-radius: 11px;
-  background: rgba(13, 17, 23, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-radius: 999px;
+  background: rgba(33, 33, 33, 0.92);
+  backdrop-filter: blur(16px) saturate(1.6);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
   color: var(--cghl-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   letter-spacing: 0.01em;
-  box-shadow: 0 8px 24px rgba(1, 4, 9, 0.4);
-  transition: all 180ms ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 0.5px rgba(255, 255, 255, 0.06) inset;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
 }
 
 #cghl-launcher:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   background: var(--cghl-bg-raised);
-  border-color: rgba(56, 139, 253, 0.35);
+  border-color: rgba(16, 163, 127, 0.3);
   color: var(--cghl-text);
-  box-shadow: 0 12px 32px rgba(1, 4, 9, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.08) inset;
 }
 
 #cghl-root.is-open #cghl-launcher {
-  background: rgba(56, 139, 253, 0.14);
-  border-color: rgba(56, 139, 253, 0.45);
-  color: var(--cghl-accent);
+  background: rgba(16, 163, 127, 0.12);
+  border-color: rgba(16, 163, 127, 0.35);
+  color: var(--cghl-accent-fg);
 }
 
 .cghl-launcher-icon {
@@ -129,36 +132,37 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: rgba(56, 139, 253, 0.14);
-  color: var(--cghl-accent);
-  font-size: 10px;
-  font-weight: 700;
+  background: var(--cghl-accent-soft);
+  color: var(--cghl-accent-fg);
+  font-size: 11px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 /* ── Panel ─────────────────────────────────────── */
 
 #cghl-panel {
-  width: 360px;
-  max-height: min(calc(100vh - 100px), 680px);
+  width: 380px;
+  max-height: min(calc(100vh - 100px), 700px);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--cghl-border);
-  border-radius: 14px;
+  border-radius: 16px;
   background: var(--cghl-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   box-shadow: var(--cghl-shadow);
   overflow: hidden;
   opacity: 0;
-  transform: translateY(10px) scale(0.98);
+  transform: translateY(12px) scale(0.96);
   transform-origin: bottom right;
   pointer-events: none;
-  transition: opacity 220ms ease, transform 220ms ease;
+  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #cghl-root.is-open #cghl-panel {
@@ -173,75 +177,76 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--cghl-border);
-  background: rgba(22, 27, 34, 0.55);
+  background: rgba(47, 47, 47, 0.5);
 }
 
 #cghl-panel-title {
   flex: 1;
   color: var(--cghl-text);
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 #cghl-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
   border-radius: 999px;
-  background: rgba(56, 139, 253, 0.12);
-  color: var(--cghl-accent);
+  background: var(--cghl-accent-soft);
+  color: var(--cghl-accent-fg);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 #cghl-harvest {
-  padding: 5px 10px;
+  padding: 5px 12px;
   border: 1px solid var(--cghl-chip-border);
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--cghl-chip-bg);
-  color: var(--cghl-accent);
-  font-size: 11px;
-  font-weight: 600;
-  transition: all 150ms ease;
+  color: var(--cghl-accent-fg);
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #cghl-harvest:hover:enabled {
-  background: rgba(56, 139, 253, 0.18);
-  border-color: rgba(56, 139, 253, 0.4);
+  background: var(--cghl-chip-active-bg);
+  border-color: var(--cghl-chip-active-border);
+  box-shadow: 0 0 12px var(--cghl-accent-glow);
 }
 
 #cghl-harvest:disabled {
-  opacity: 0.42;
+  opacity: 0.35;
   cursor: default;
 }
 
 #cghl-debug-toggle {
   padding: 4px 8px;
   border: 1px solid var(--cghl-border-subtle);
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--cghl-text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  transition: all 150ms ease;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 180ms ease;
 }
 
 #cghl-debug-toggle:hover {
-  border-color: rgba(56, 139, 253, 0.3);
+  border-color: rgba(16, 163, 127, 0.25);
   color: var(--cghl-text-dim);
 }
 
 #cghl-debug-toggle.cghl-debug-on {
-  background: rgba(56, 139, 253, 0.12);
-  border-color: rgba(56, 139, 253, 0.4);
-  color: var(--cghl-accent);
+  background: var(--cghl-accent-soft);
+  border-color: rgba(16, 163, 127, 0.35);
+  color: var(--cghl-accent-fg);
 }
 
 /* ── List (scrollable tree body) ───────────────── */
@@ -250,13 +255,13 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 4px 0;
+  padding: 6px 0;
   scrollbar-width: thin;
-  scrollbar-color: rgba(56, 139, 253, 0.18) transparent;
+  scrollbar-color: rgba(16, 163, 127, 0.15) transparent;
 }
 
 #cghl-list::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 #cghl-list::-webkit-scrollbar-track {
@@ -265,18 +270,32 @@
 
 #cghl-list::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(56, 139, 253, 0.18);
+  background: rgba(16, 163, 127, 0.15);
 }
 
-/* ── Tree row ──────────────────────────────────── */
+#cghl-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 163, 127, 0.28);
+}
+
+/* ═══════════════════════════════════════════════════
+   Tree row + connector system
+   ─────────────────────────────────────────────────
+   Key design: rows use align-items: stretch so guide
+   columns fill the full row height. Connectors use
+   percentage-based positions (top: 50%) which auto-
+   matically align with the vertically-centered dot.
+   No magic pixel offsets needed.
+   ═══════════════════════════════════════════════════ */
 
 .cghl-row {
   display: flex;
-  align-items: stretch;
-  min-height: 32px;
-  padding: 4px 12px 4px 10px;
-  transition: background 150ms ease;
+  align-items: stretch;          /* guides fill full row height */
+  min-height: 36px;
+  padding: 0 14px 0 12px;
+  transition: background 180ms ease;
   --gline: var(--cghl-line);
+  border-left: 2px solid transparent;
+  cursor: pointer;
 }
 
 .cghl-row:hover {
@@ -285,13 +304,22 @@
 
 .cghl-row[data-active] {
   background: var(--cghl-bg-active);
+  border-left-color: var(--cghl-accent);
+  /* --gline NOT set here — ancestor guides stay neutral */
+}
+
+/* Only the direct connector (last guide in indent) highlights */
+.cghl-row[data-active] > .cghl-indent > .cghl-guide:last-child {
   --gline: var(--cghl-line-active);
-  box-shadow: inset 2px 0 0 var(--cghl-accent-fg);
 }
 
 .cghl-row[data-current] {
   background: var(--cghl-bg-current);
-  box-shadow: inset 2px 0 0 var(--cghl-dot-current);
+  border-left-color: var(--cghl-accent-fg);
+}
+
+.cghl-row[data-current] > .cghl-indent > .cghl-guide:last-child {
+  --gline: var(--cghl-line-active);
 }
 
 /* ── Indent container ──────────────────────────── */
@@ -299,6 +327,7 @@
 .cghl-indent {
   display: flex;
   flex-shrink: 0;
+  align-self: stretch;           /* ensure guides get full height */
 }
 
 /* ── Guide columns (tree connectors) ───────────── */
@@ -307,83 +336,97 @@
   position: relative;
   width: var(--cghl-guide-w);
   flex-shrink: 0;
+  /* inherits stretch from parent → full row height */
 }
 
-/* │ pipe — continuing vertical line */
+/* │ pipe — full-height vertical continuation line */
 .cghl-guide--pipe::before {
   content: "";
   position: absolute;
-  left: calc(var(--cghl-guide-w) / 2 - 0.75px);
-  top: -6px;
-  bottom: -6px;
-  width: 1.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 1px;
   background: var(--gline);
+  transition: background 180ms ease;
 }
 
-/* (empty) — ancestor was last child, no line */
+/* (empty) — ancestor was last child, gap */
 .cghl-guide--empty {
-  /* nothing */
+  /* intentionally blank */
 }
 
-/* ├ branch — vertical line + horizontal stub */
+/* ├ branch — vertical full-height + horizontal stub at center */
 .cghl-guide--branch::before {
   content: "";
   position: absolute;
-  left: calc(var(--cghl-guide-w) / 2 - 0.75px);
-  top: -6px;
-  bottom: -6px;
-  width: 1.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  width: 1px;
   background: var(--gline);
+  transition: background 180ms ease;
 }
 
 .cghl-guide--branch::after {
   content: "";
   position: absolute;
-  left: calc(var(--cghl-guide-w) / 2);
-  top: calc(var(--cghl-connector-y) - 0.75px);
-  width: calc(var(--cghl-guide-w) / 2 + 4px);
-  height: 1.5px;
+  left: 50%;
+  top: 50%;
+  width: calc(50% + 2px);
+  height: 1px;
   background: var(--gline);
+  transition: background 180ms ease;
 }
 
-/* └ elbow — L-shaped connector (last child) */
+/* └ elbow — L-shaped, top→center vertical + horizontal turn */
 .cghl-guide--elbow::before {
   content: "";
   position: absolute;
-  left: calc(var(--cghl-guide-w) / 2 - 0.75px);
-  top: -6px;
-  width: calc(var(--cghl-guide-w) / 2 + 4.75px);
-  height: calc(var(--cghl-connector-y) + 6px + 0.75px);
-  border-left: 1.5px solid var(--gline);
-  border-bottom: 1.5px solid var(--gline);
-  border-bottom-left-radius: 6px;
+  left: calc(50% - 0.5px);
+  top: 0;
+  height: 50%;
+  width: calc(50% + 2.5px);
+  border-left: 1px solid var(--gline);
+  border-bottom: 1px solid var(--gline);
+  border-bottom-left-radius: 8px;
   background: none;
+  transition: border-color 180ms ease;
 }
 
 /* ── Tree dot ──────────────────────────────────── */
 
 .cghl-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 5px;
-  margin-right: 8px;
+  align-self: center;            /* vertically centered in row */
+  margin-right: 10px;
   background: var(--cghl-dot-fill);
   border: 1.5px solid var(--cghl-dot-stroke);
-  transition: all 200ms ease;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .cghl-row[data-active] .cghl-dot {
   background: var(--cghl-dot-active);
   border-color: var(--cghl-dot-active);
+  box-shadow: 0 0 6px rgba(16, 163, 127, 0.3);
 }
 
 .cghl-row[data-current] .cghl-dot {
   background: var(--cghl-dot-current);
   border-color: var(--cghl-dot-current);
-  box-shadow: 0 0 7px rgba(88, 166, 255, 0.5);
+  box-shadow: 0 0 10px rgba(25, 195, 125, 0.45),
+    0 0 3px rgba(25, 195, 125, 0.7);
+  animation: cghl-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cghl-dot-pulse {
+  0%, 100% { box-shadow: 0 0 6px rgba(25, 195, 125, 0.35), 0 0 2px rgba(25, 195, 125, 0.6); }
+  50% { box-shadow: 0 0 12px rgba(25, 195, 125, 0.5), 0 0 4px rgba(25, 195, 125, 0.8); }
 }
 
 /* ── Node info area ────────────────────────────── */
@@ -391,35 +434,35 @@
 .cghl-info {
   flex: 1;
   min-width: 0;
-  align-self: flex-start;
+  align-self: center;            /* vertically centered in row */
   display: flex;
-  flex-direction: column;
-  gap: 3px;
-  padding-bottom: 2px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
 }
 
-/* Text button (clickable summary) */
+/* Text button (clickable summary) — single line truncated */
 .cghl-text-btn {
-  display: -webkit-box;
-  width: 100%;
-  padding: 1px 4px;
+  display: block;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
   border: 0;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--cghl-text-dim);
   font-size: 13px;
   font-weight: 400;
-  line-height: 1.4;
+  line-height: 1.5;
   text-align: left;
+  white-space: nowrap;
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
+  text-overflow: ellipsis;
   transition: color 180ms ease, background 150ms ease;
 }
 
 .cghl-text-btn:hover {
-  background: var(--cghl-bg-hover);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--cghl-text);
 }
 
@@ -436,47 +479,50 @@
 /* ── Branch tag (subtle version indicator) ────── */
 
 .cghl-branch-tag {
-  display: inline-block;
-  padding: 0 5px;
-  margin-left: 4px;
-  border-radius: 3px;
-  background: rgba(56, 139, 253, 0.08);
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--cghl-accent-soft);
   color: var(--cghl-text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  line-height: 1.6;
+  line-height: 1.5;
   cursor: default;
+  white-space: nowrap;
 }
 
 .cghl-row[data-active] .cghl-branch-tag {
-  background: rgba(56, 139, 253, 0.14);
-  color: var(--cghl-text-dim);
+  background: rgba(16, 163, 127, 0.12);
+  color: var(--cghl-accent);
 }
 
 /* ── Branch badge ──────────────────────────────── */
 
 .cghl-badge {
-  display: inline-block;
-  max-width: fit-content;
-  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 1px 6px;
   border-radius: 4px;
-  margin-left: 4px;
-  background: rgba(56, 139, 253, 0.07);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--cghl-text-muted);
   font-size: 10px;
-  font-weight: 600;
-  line-height: 1.6;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 /* ── Empty state ───────────────────────────────── */
 
 .cghl-empty {
-  padding: 20px 16px;
+  padding: 28px 20px;
   color: var(--cghl-text-muted);
-  font-size: 12px;
+  font-size: 13px;
   text-align: center;
-  line-height: 1.6;
+  line-height: 1.7;
   white-space: pre-line;
 }
 
@@ -489,20 +535,21 @@
   z-index: 2147483646;
   max-width: 280px;
   pointer-events: none;
-  padding: 8px 12px;
-  border-radius: 9px;
+  padding: 8px 14px;
+  border-radius: 10px;
   border: 1px solid var(--cghl-border);
-  background: rgba(13, 17, 23, 0.96);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(33, 33, 33, 0.95);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
   color: var(--cghl-text-secondary);
   font-family: inherit;
   font-size: 12px;
-  line-height: 1.45;
-  box-shadow: 0 12px 28px rgba(1, 4, 9, 0.4);
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 180ms ease, transform 180ms ease;
+  transform: translateY(8px);
+  transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 #cghl-status.is-visible {
@@ -513,20 +560,20 @@
 /* ── Flash highlight (on jumped-to message) ────── */
 
 .cghl-message-flash {
-  outline: 2px solid rgba(56, 139, 253, 0.7);
+  outline: 2px solid rgba(16, 163, 127, 0.65);
   outline-offset: 3px;
   border-radius: 12px;
-  animation: cghl-flash 950ms ease-out;
+  animation: cghl-flash 1000ms ease-out;
 }
 
 @keyframes cghl-flash {
   0% {
-    outline-color: rgba(56, 139, 253, 0.9);
+    outline-color: rgba(25, 195, 125, 0.85);
     outline-offset: 6px;
   }
 
   100% {
-    outline-color: rgba(56, 139, 253, 0);
+    outline-color: rgba(25, 195, 125, 0);
     outline-offset: 2px;
   }
 }
@@ -534,13 +581,13 @@
 /* ── Row entry animation ───────────────────────── */
 
 .cghl-row {
-  animation: cghl-row-in 220ms ease both;
+  animation: cghl-row-in 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes cghl-row-in {
   from {
     opacity: 0;
-    transform: translateX(-5px);
+    transform: translateX(-6px);
   }
 
   to {
@@ -553,7 +600,7 @@
 
 #cghl-debug-panel {
   border-top: 1px solid var(--cghl-border);
-  background: rgba(13, 17, 23, 0.7);
+  background: rgba(25, 25, 25, 0.7);
   max-height: 180px;
   display: flex;
   flex-direction: column;
@@ -563,11 +610,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   color: var(--cghl-text-muted);
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--cghl-border-subtle);
 }
@@ -577,19 +624,19 @@
 }
 
 .cghl-dbg-btn {
-  padding: 1px 5px;
+  padding: 2px 6px;
   border: 1px solid var(--cghl-border-subtle);
-  border-radius: 3px;
+  border-radius: 4px;
   background: transparent;
   color: var(--cghl-text-muted);
   font-size: 11px;
   cursor: pointer;
-  transition: all 120ms ease;
+  transition: all 150ms ease;
 }
 
 .cghl-dbg-btn:hover {
   background: var(--cghl-bg-hover);
-  border-color: rgba(56, 139, 253, 0.3);
+  border-color: rgba(16, 163, 127, 0.25);
   color: var(--cghl-text-dim);
 }
 
@@ -597,16 +644,16 @@
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px 10px;
+  padding: 6px 12px;
   margin: 0;
   color: var(--cghl-text-dim);
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: "Söhne Mono", "SF Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
   font-size: 10px;
-  line-height: 1.55;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
   scrollbar-width: thin;
-  scrollbar-color: rgba(56, 139, 253, 0.12) transparent;
+  scrollbar-color: rgba(16, 163, 127, 0.1) transparent;
 }
 
 .cghl-dbg-body::-webkit-scrollbar {
@@ -615,7 +662,7 @@
 
 .cghl-dbg-body::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(56, 139, 253, 0.12);
+  background: rgba(16, 163, 127, 0.1);
 }
 
 .cghl-dbg-ts {
@@ -623,7 +670,7 @@
 }
 
 .cghl-dbg-ev {
-  color: var(--cghl-accent);
+  color: var(--cghl-accent-fg);
   font-weight: 600;
 }
 
