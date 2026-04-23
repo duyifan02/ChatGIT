@@ -35,6 +35,7 @@
   const THROTTLE_MS = 120;
   const SCROLL_ANCHOR = 0.28;
   const URL_CHANGE_EVENT = "cghl-url-change";
+  const THEME_CHECK_EVENT = "cghl-theme-check";
   const DEBUG_MAX_LOG = 500;
 
   /* ═══════════════════════════════════════════════
@@ -125,6 +126,43 @@
     return { current, total, hasVariants: total > 1 };
   }
 
+  function parseColorChannel(token) {
+    if (!token) return 0;
+    if (token.endsWith("%")) {
+      return clamp(Math.round((Number(token.slice(0, -1)) / 100) * 255), 0, 255);
+    }
+    return clamp(Number(token), 0, 255);
+  }
+
+  function luminanceFromColor(color) {
+    if (!color) return null;
+    const normalized = color.trim().toLowerCase();
+    if (!normalized || normalized === "transparent") return null;
+
+    const rgb = normalized.match(/^rgba?\(([^)]+)\)$/);
+    if (rgb) {
+      const parts = rgb[1].split(",").map(part => part.trim());
+      if (parts.length >= 3) {
+        const r = parseColorChannel(parts[0]);
+        const g = parseColorChannel(parts[1]);
+        const b = parseColorChannel(parts[2]);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+    }
+
+    const hex = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hex) {
+      const raw = hex[1];
+      const full = raw.length === 3 ? raw.split("").map(ch => ch + ch).join("") : raw;
+      const r = parseInt(full.slice(0, 2), 16);
+      const g = parseInt(full.slice(2, 4), 16);
+      const b = parseInt(full.slice(4, 6), 16);
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    return null;
+  }
+
   function ts() {
     const d = new Date();
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}.${String(d.getMilliseconds()).padStart(3, "0")}`;
@@ -177,6 +215,7 @@
       this.scrollContainer = null;
       this.treeNodes = new Map();
       this.branchCache = new Map();
+      this.replySwitcherIndex = new Map();
       this.livePathKeys = [];
       this.activeNodeKey = "";
       this.switching = false;
@@ -184,6 +223,9 @@
       this.panelOpen = false;
       this.lastSignature = "";
       this.nodeSeq = 0;
+      this.theme = "dark";
+      this.themeObserver = null;
+      this.themeMedia = null;
 
       // Debug mode
       this.debugEnabled = false;
@@ -226,6 +268,7 @@
     init() {
       this.loadCache();
       this.injectUI();
+      this.applyTheme(this.detectTheme());
       this.attachEvents();
       this.observeDom();
       this.rebuild();
@@ -470,9 +513,9 @@
         }
       });
 
+      this.root.appendChild(this.status);
       this.root.appendChild(this.panel);
       this.root.appendChild(this.launcher);
-      document.body.appendChild(this.status);
       document.body.appendChild(this.root);
     }
 
@@ -502,12 +545,72 @@
       this.status.classList.remove("is-visible");
     }
 
+    detectTheme() {
+      const html = document.documentElement;
+      const body = document.body;
+      const themeTokens = [
+        html?.getAttribute("data-theme"),
+        body?.getAttribute("data-theme"),
+        html?.className,
+        body?.className
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      if (/(^|\s)dark($|\s)|dark-mode|theme-dark/.test(themeTokens)) return "dark";
+      if (/(^|\s)light($|\s)|light-mode|theme-light/.test(themeTokens)) return "light";
+
+      const backgroundCandidates = [
+        body ? window.getComputedStyle(body).backgroundColor : "",
+        html ? window.getComputedStyle(html).backgroundColor : ""
+      ];
+
+      for (const color of backgroundCandidates) {
+        const luminance = luminanceFromColor(color);
+        if (luminance == null) continue;
+        return luminance < 140 ? "dark" : "light";
+      }
+
+      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+    }
+
+    applyTheme(theme) {
+      this.theme = theme === "light" ? "light" : "dark";
+      if (this.root) this.root.dataset.theme = this.theme;
+      if (this.status) this.status.dataset.theme = this.theme;
+    }
+
+    refreshTheme() {
+      this.applyTheme(this.detectTheme());
+    }
+
     /* ─── Events ────────────────────────────────── */
 
     attachEvents() {
       window.addEventListener("scroll", this.handleScroll, { passive: true });
       window.addEventListener("resize", this.handleResize, { passive: true });
       window.addEventListener(URL_CHANGE_EVENT, () => this.handleUrlChange());
+      window.addEventListener(THEME_CHECK_EVENT, () => this.refreshTheme());
+      if (window.matchMedia) {
+        this.themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+        const onThemeMediaChange = () => this.refreshTheme();
+        if (typeof this.themeMedia.addEventListener === "function") {
+          this.themeMedia.addEventListener("change", onThemeMediaChange);
+        } else if (typeof this.themeMedia.addListener === "function") {
+          this.themeMedia.addListener(onThemeMediaChange);
+        }
+      }
+      if (document.documentElement && document.body) {
+        this.themeObserver = new MutationObserver(() => this.refreshTheme());
+        this.themeObserver.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ["class", "data-theme", "style"]
+        });
+        this.themeObserver.observe(document.body, {
+          attributes: true,
+          attributeFilter: ["class", "data-theme", "style"]
+        });
+      }
       document.addEventListener("click", e => {
         if (this.root && !this.root.contains(e.target)) {
           this.setPanelOpen(false);
@@ -529,6 +632,7 @@
     }
 
     handleResize() {
+      this.refreshTheme();
       this.rebuildT();
     }
 
@@ -537,6 +641,7 @@
       this.log("urlChange", `${this.currentHref} → ${location.href}`);
       this.currentHref = location.href;
       this.loadCache();
+      this.refreshTheme();
       this.rebuild();
     }
 
@@ -731,10 +836,90 @@
       return null;
     }
 
+    scanReplyVersionStable(root) {
+      const fallback = this.scanReplyVersion(root);
+      if (!root) return fallback;
+
+      const candidates = [];
+      const seen = new Set();
+      const addCandidate = (el, source) => {
+        if (!el || seen.has(el)) return;
+        const text = (el.textContent || "").trim();
+        if (!text || text.length > 12) return;
+        const parsed = parseVersion(text);
+        if (!parsed) return;
+        seen.add(el);
+        candidates.push({ el, parsed, source });
+      };
+
+      for (const node of root.querySelectorAll(".tabular-nums")) {
+        addCandidate(node, "tabular");
+      }
+
+      const navButtons = Array.from(root.querySelectorAll('button[aria-label], [role="button"][aria-label]')).filter(btn => {
+        const label = btn.getAttribute("aria-label") || "";
+        return /涓婁竴鍥炲|涓嬩竴鍥炲|Previous|Next|涓婁竴|涓嬩竴/i.test(label);
+      });
+
+      for (const btn of navButtons) {
+        let container = btn.parentElement;
+        for (let depth = 0; depth < 4 && container; depth++) {
+          addCandidate(container, "button-container");
+          for (const nearby of container.querySelectorAll(".tabular-nums, span, div")) {
+            if (nearby.children.length > 3 && !nearby.classList.contains("tabular-nums")) continue;
+            addCandidate(nearby, "button-nearby");
+          }
+          container = container.parentElement;
+        }
+      }
+
+      for (const el of root.querySelectorAll("span, div")) {
+        if (el.children.length > 3) continue;
+        addCandidate(el, "generic");
+      }
+
+      if (candidates.length === 0) return fallback;
+
+      const buttonRects = navButtons.map(btn => btn.getBoundingClientRect());
+      const bandLeft = buttonRects.length > 0 ? Math.min(...buttonRects.map(rect => rect.left)) : 0;
+      const bandRight = buttonRects.length > 0 ? Math.max(...buttonRects.map(rect => rect.right)) : 0;
+      const scoreCandidate = candidate => {
+        const { el, source } = candidate;
+        const rect = el.getBoundingClientRect();
+        let score = 0;
+
+        if (source === "tabular") score += 8;
+        if (source === "button-container") score += 7;
+        if (source === "button-nearby") score += 5;
+
+        if (buttonRects.length > 0) {
+          let minDistance = Infinity;
+          let aligned = false;
+          for (const btnRect of buttonRects) {
+            const dx = Math.abs((rect.left + rect.right) / 2 - (btnRect.left + btnRect.right) / 2);
+            const dy = Math.abs((rect.top + rect.bottom) / 2 - (btnRect.top + btnRect.bottom) / 2);
+            minDistance = Math.min(minDistance, dx + dy);
+            if (rect.bottom >= btnRect.top - 10 && rect.top <= btnRect.bottom + 10) aligned = true;
+          }
+
+          const insideBand = rect.left >= bandLeft - 24 && rect.right <= bandRight + 24;
+          if (aligned) score += 8;
+          if (insideBand) score += 5;
+          if (Number.isFinite(minDistance)) score += Math.max(0, 18 - minDistance / 12);
+        }
+
+        score += rect.top / 1000;
+        return score;
+      };
+
+      candidates.sort((a, b) => scoreCandidate(b) - scoreCandidate(a));
+      return candidates[0]?.parsed || fallback;
+    }
+
     getReplyVersion(userTurn, assistantTurn, turnId) {
       const fresh =
-        this.scanReplyVersion(userTurn) ||
-        this.scanReplyVersion(assistantTurn) ||
+        this.scanReplyVersionStable(userTurn) ||
+        this.scanReplyVersionStable(assistantTurn) ||
         { current: 1, total: 1, hasVariants: false };
 
       const cached = this.branchCache.get(turnId);
@@ -759,12 +944,200 @@
       });
     }
 
+    getReplyLabels(direction) {
+      return direction < 0
+        ? ["涓婁竴鍥炲", "Previous response"]
+        : ["涓嬩竴鍥炲", "Next response"];
+    }
+
+    getReplyButtonPatterns(direction) {
+      return direction < 0
+        ? [/涓婁竴/i, /previous/i, /prev/i, /鍚戝墠/i]
+        : [/涓嬩竴/i, /next/i, /鍚戝悗/i];
+    }
+
+    findReplyButtonsInRoot(root, direction) {
+      if (!root) return [];
+      const labels = this.getReplyLabels(direction);
+      const patterns = this.getReplyButtonPatterns(direction);
+      const seen = new Set();
+      const matches = [];
+      const add = btn => {
+        if (!btn || btn.disabled || seen.has(btn)) return;
+        seen.add(btn);
+        matches.push(btn);
+      };
+
+      for (const label of labels) {
+        root.querySelectorAll(`button[aria-label="${label}"], [role="button"][aria-label="${label}"]`).forEach(add);
+      }
+
+      root.querySelectorAll('button, [role="button"]').forEach(btn => {
+        if (btn.disabled || seen.has(btn)) return;
+        const haystack = [
+          btn.getAttribute("aria-label") || "",
+          btn.getAttribute("title") || "",
+          btn.textContent || ""
+        ].join(" ");
+        if (patterns.some(pattern => pattern.test(haystack))) add(btn);
+      });
+
+      return matches;
+    }
+
+    buildReplySwitcherIndex(turnHits, assistantTurns) {
+      const index = new Map();
+      if (!turnHits?.length) return index;
+
+      const allButtons = this.findReplyButtonsInRoot(document, -1)
+        .concat(this.findReplyButtonsInRoot(document, 1));
+      if (allButtons.length === 0) return index;
+
+      const groups = [];
+      const seenContainers = new Set();
+
+      for (const btn of allButtons) {
+        let container = btn.parentElement;
+        let best = null;
+        for (let depth = 0; depth < 6 && container; depth++) {
+          const prevButtons = this.findReplyButtonsInRoot(container, -1);
+          const nextButtons = this.findReplyButtonsInRoot(container, 1);
+          const version = this.scanReplyVersionStable(container) || this.scanReplyVersion(container);
+          if ((prevButtons.length || nextButtons.length) && version) {
+            best = { container, prevButtons, nextButtons, version };
+            if (prevButtons.length && nextButtons.length) break;
+          }
+          container = container.parentElement;
+        }
+
+        if (!best || seenContainers.has(best.container)) continue;
+        seenContainers.add(best.container);
+        groups.push(best);
+      }
+
+      const turnMeta = turnHits
+        .map((turn, idx) => {
+          const testId = getStableTestId(turn) || "";
+          const turnTop = elTop(turn);
+          const nextTurn = turnHits[idx + 1] || null;
+          const nextTurnTop = nextTurn ? elTop(nextTurn) : Infinity;
+          const assistantTurn = assistantTurns.find(a => {
+            const aTop = elTop(a);
+            return aTop > turnTop && aTop < nextTurnTop;
+          }) || null;
+          const anchorTop = assistantTurn ? elTop(assistantTurn) : turnTop;
+          return { testId, turnTop, nextTurnTop, anchorTop };
+        })
+        .filter(meta => meta.testId);
+
+      for (const group of groups) {
+        const rect = group.container.getBoundingClientRect();
+        const centerY = rect.top + window.scrollY + rect.height / 2;
+        let bestMeta = null;
+        let bestScore = -Infinity;
+
+        for (const meta of turnMeta) {
+          const inRange = centerY >= meta.turnTop - 40 && centerY < meta.nextTurnTop + 20;
+          const distance = Math.abs(centerY - meta.anchorTop);
+          let score = -distance / 20;
+          if (inRange) score += 100;
+          if (centerY >= meta.turnTop - 8) score += 20;
+          if (centerY < meta.turnTop - 60) score -= 80;
+          if (score > bestScore) {
+            bestScore = score;
+            bestMeta = meta;
+          }
+        }
+
+        if (!bestMeta) continue;
+        index.set(bestMeta.testId, {
+          testId: bestMeta.testId,
+          container: group.container,
+          version: group.version,
+          prevButtons: group.prevButtons,
+          nextButtons: group.nextButtons
+        });
+      }
+
+      return index;
+    }
+
+    scoreReplyButtonCandidate(msg, button) {
+      if (!msg || !button) return -Infinity;
+
+      const buttonRect = button.getBoundingClientRect();
+      const buttonCenterY = buttonRect.top + window.scrollY + buttonRect.height / 2;
+      const buttonCenterX = buttonRect.left + window.scrollX + buttonRect.width / 2;
+      const anchors = [msg.assistantTurn, msg.focusElement, msg.element].filter(Boolean);
+      let score = 0;
+
+      for (const anchor of anchors) {
+        if (!anchor?.isConnected) continue;
+        const anchorRect = anchor.getBoundingClientRect();
+        const anchorCenterY = anchorRect.top + window.scrollY + anchorRect.height / 2;
+        const anchorCenterX = anchorRect.left + window.scrollX + anchorRect.width / 2;
+        const dy = Math.abs(buttonCenterY - anchorCenterY);
+        const dx = Math.abs(buttonCenterX - anchorCenterX);
+        score = Math.max(score, 100 - dy / 10 - dx / 20);
+
+        const sameSection = anchor.closest('[data-testid^="conversation-turn-"]') === button.closest('[data-testid^="conversation-turn-"]');
+        if (sameSection) score += 80;
+      }
+
+      const sameAssistantTurn = msg.assistantTurn && msg.assistantTurn.contains(button);
+      if (sameAssistantTurn) score += 120;
+
+      const container = button.parentElement;
+      if (container && (this.scanReplyVersionStable(container) || this.scanReplyVersion(container))) {
+        score += 40;
+      }
+
+      if (button.closest("#cghl-root")) score -= 500;
+      return score;
+    }
+
+    pickBestReplyButton(msg, buttons, direction, source) {
+      const uniqueButtons = dedupe((buttons || []).filter(Boolean)).filter(btn => !btn.disabled);
+      if (uniqueButtons.length === 0) return null;
+
+      let best = null;
+      let bestScore = -Infinity;
+      for (const btn of uniqueButtons) {
+        const score = this.scoreReplyButtonCandidate(msg, btn);
+        if (score > bestScore) {
+          bestScore = score;
+          best = btn;
+        }
+      }
+
+      if (best) {
+        this.log("getReplyButton", `Found via ${source} for ${msg?.testId || msg?.turnId || "unknown"}`, {
+          dir: direction,
+          score: Math.round(bestScore)
+        });
+      }
+      return best;
+    }
+
     /**
      * Find the prev/next response button near a given message.
-     * Searches multiple DOM roots (assistant turn, user turn, sibling sections)
+     * Searches multiple DOM roots (assistant turn, user turn, local containers)
      * for buttons with known aria-labels or text patterns.
      */
     getReplyButton(msg, direction) {
+      const indexed = msg?.testId ? this.replySwitcherIndex.get(msg.testId) : null;
+      if (indexed) {
+        const buttons = direction < 0 ? indexed.prevButtons : indexed.nextButtons;
+        const btn = Array.from(buttons || []).find(node => node && !node.disabled);
+        if (btn) {
+          this.log("getReplyButton", `Found via switcher index for ${msg.testId}`, {
+            dir: direction,
+            version: indexed.version
+          });
+          return btn;
+        }
+      }
+
       const possibleRoots = [];
 
       // 1. Assistant turn and its parent
@@ -774,31 +1147,56 @@
         if (parent) possibleRoots.push(parent);
       }
 
-      // 2. User turn element, its section, and sibling sections
+      // 2. User turn element and its local section container
       if (msg.element) {
         possibleRoots.push(msg.element);
         const section = msg.element.closest('section[data-testid^="conversation-turn-"]');
         if (section) {
           possibleRoots.push(section);
-          const nextSibling = section.nextElementSibling;
-          if (nextSibling) possibleRoots.push(nextSibling);
-          const prevSibling = section.previousElementSibling;
-          if (prevSibling) possibleRoots.push(prevSibling);
+          const parent = section.parentElement;
+          if (parent) possibleRoots.push(parent);
         }
       }
 
-      // 3. Focus element section
+      // 3. Focus element section and its local container
       if (msg.focusElement && msg.focusElement !== msg.element) {
         possibleRoots.push(msg.focusElement);
         const section = msg.focusElement.closest('section[data-testid^="conversation-turn-"]');
         if (section) {
           possibleRoots.push(section);
-          const nextSibling = section.nextElementSibling;
-          if (nextSibling) possibleRoots.push(nextSibling);
+          const parent = section.parentElement;
+          if (parent) possibleRoots.push(parent);
         }
       }
 
       const roots = dedupe(possibleRoots);
+
+      const directCandidates = [];
+      for (const root of roots) {
+        for (const label of this.getReplyLabels(direction)) {
+          root.querySelectorAll(`button[aria-label="${label}"]`).forEach(btn => {
+            if (!btn.disabled) directCandidates.push(btn);
+          });
+        }
+      }
+      const directBest = this.pickBestReplyButton(msg, directCandidates, direction, "scored direct labels");
+      if (directBest) return directBest;
+
+      const regexCandidates = [];
+      const patterns = this.getReplyButtonPatterns(direction);
+      for (const root of roots) {
+        root.querySelectorAll('button, [role="button"]').forEach(btn => {
+          if (btn.disabled) return;
+          const haystack = [
+            btn.getAttribute("aria-label") || "",
+            btn.getAttribute("title") || "",
+            btn.textContent || ""
+          ].join(" ");
+          if (patterns.some(p => p.test(haystack))) regexCandidates.push(btn);
+        });
+      }
+      const regexBest = this.pickBestReplyButton(msg, regexCandidates, direction, "scored regex");
+      if (regexBest) return regexBest;
 
       // Direct selectors (fastest)
       const directLabels = direction < 0
@@ -807,8 +1205,8 @@
 
       for (const root of roots) {
         for (const label of directLabels) {
-          const btn = root.querySelector(`button[aria-label="${label}"]`);
-          if (btn && !btn.disabled) {
+          const btn = Array.from(root.querySelectorAll(`button[aria-label="${label}"]`)).find(node => !node.disabled);
+          if (btn) {
             this.log("getReplyButton", `Found via label "${label}" in ${root.tagName}.${root.className?.split(" ")[0] || ""}#${root.dataset?.testid || "?"}`);
             return btn;
           }
@@ -816,7 +1214,7 @@
       }
 
       // Regex fallback: broader set of patterns
-      const patterns = direction < 0
+      const legacyPatterns = direction < 0
         ? [/上一/i, /previous/i, /prev/i, /向前/i]
         : [/下一/i, /next/i, /向后/i];
 
@@ -829,7 +1227,7 @@
             btn.getAttribute("title") || "",
             btn.textContent || ""
           ].join(" ");
-          if (patterns.some(p => p.test(haystack))) {
+          if (legacyPatterns.some(p => p.test(haystack))) {
             this.log("getReplyButton", `Found via regex in ${root.tagName}`, { haystack: haystack.slice(0, 40) });
             return btn;
           }
@@ -873,6 +1271,7 @@
         .filter(t => !isNonConv(t));
 
       const assistantTurns = this.getAssistantTurns();
+      this.replySwitcherIndex = this.buildReplySwitcherIndex(turnHits, assistantTurns);
 
       if (turnHits.length > 0) {
         const entries = turnHits.map(turn => {
@@ -890,7 +1289,8 @@
               const aTop = elTop(a);
               return aTop > turnTop && (nextUserTop === undefined || aTop < nextUserTop);
             }) || null;
-          const replyVersion = this.getReplyVersion(turn, assistantTurn, turnId);
+          const switcher = this.replySwitcherIndex.get(testId);
+          const replyVersion = switcher?.version || this.getReplyVersion(turn, assistantTurn, turnId);
           return { turnElement: turn, focusElement: focus, assistantTurn, replyVersion, turnId, messageId, testId };
         });
 
@@ -914,6 +1314,7 @@
         .sort((a, b) => elTop(a) - elTop(b));
 
       if (msgHits.length > 0) {
+        this.replySwitcherIndex = new Map();
         return msgHits.map(node => {
           const turnEl = node.closest('[data-testid^="conversation-turn-"]') || node;
           const turnId = this.getTurnId(turnEl, node);
@@ -931,6 +1332,7 @@
         });
       }
 
+      this.replySwitcherIndex = new Map();
       return [];
     }
 
@@ -1474,6 +1876,22 @@
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     }
 
+    async waitForMsgReappear(testId, turnId, posIndex, timeoutMs = 2500) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        await sleep(100);
+        await new Promise(r => requestAnimationFrame(r));
+        this.rebuild();
+        const { msg } = this.findMsgRobust(turnId, testId, posIndex);
+        if (msg) {
+          this.log("waitReappear", `testId=${testId} reappeared after ${Date.now() - start}ms`);
+          return msg;
+        }
+      }
+      this.log("waitReappear", `TIMEOUT waiting for testId=${testId} to reappear (${timeoutMs}ms)`);
+      return null;
+    }
+
     /**
      * Wait for the version indicator at a given position to change.
      * Uses testId (data-testid) for lookup since turnId (data-message-id)
@@ -1481,6 +1899,7 @@
      */
     async waitForVersionChange(testId, turnId, expectedVersion, timeoutMs = 2500) {
       const start = Date.now();
+      let missingLogged = false;
       while (Date.now() - start < timeoutMs) {
         await sleep(100);
         await new Promise(r => requestAnimationFrame(r));
@@ -1488,6 +1907,10 @@
         const entries = this.getUserTurnEntries();
         // Find by testId first (stable), then turnId
         const match = entries.find(e => e.testId === testId) || entries.find(e => e.turnId === turnId);
+        if (!match && !missingLogged) {
+          this.log("waitVersion", `testId=${testId} temporarily missing while waiting for v${expectedVersion}`);
+          missingLogged = true;
+        }
         if (match && match.replyVersion?.current === expectedVersion) {
           this.log("waitVersion", `v${expectedVersion} confirmed for testId=${testId} after ${Date.now() - start}ms`);
           return true;
@@ -1609,13 +2032,21 @@
       while (safety-- > 0) {
         this.rebuild();
 
-        // Robust lookup: try turnId, testId, then index
-        const { msg, newTurnId } = this.findMsgRobust(currentTurnId, testId, posIndex);
+        let { msg, newTurnId } = this.findMsgRobust(currentTurnId, testId, posIndex);
         if (!msg) {
-          this.log("goToVariant", `msg NOT FOUND (tried turnId=${currentTurnId}, testId=${testId}, idx=${posIndex})`);
-          return false;
+          const reappeared = await this.waitForMsgReappear(testId, currentTurnId, posIndex, Math.max(waitMs * 10, 1200));
+          if (!reappeared) {
+            this.log("goToVariant", `msg NOT FOUND (tried turnId=${currentTurnId}, testId=${testId}, idx=${posIndex})`);
+            return false;
+          }
+          this.rebuild();
+          ({ msg, newTurnId } = this.findMsgRobust(currentTurnId, testId, posIndex));
+          if (!msg) {
+            this.log("goToVariant", `msg missing before step, waiting for reappear (turnId=${currentTurnId}, testId=${testId}, idx=${posIndex})`);
+            return false;
+          }
         }
-        currentTurnId = newTurnId; // Track ID changes
+        currentTurnId = newTurnId;
 
         const current = msg.replyVersion?.current;
         this.log("goToVariant", `v${current} → v${target}, hasVariants=${msg.replyVersion?.hasVariants}, total=${msg.replyVersion?.total}`);
@@ -1645,12 +2076,12 @@
         this.log("goToVariant", `Clicking (dir=${dir})...`);
         this.triggerClick(btn);
 
-        // Wait for DOM to reflect the version change
         const expectedV = current + dir;
-        const changed = await this.waitForVersionChange(testId, currentTurnId, expectedV, Math.max(waitMs * 4, 800));
+        const changed = await this.waitForVersionChange(testId, currentTurnId, expectedV, Math.max(waitMs * 8, 1600));
         if (!changed) {
           this.log("goToVariant", `Version change not detected, fallback wait ${waitMs}ms`);
           await this.waitDom(waitMs);
+          await this.waitForMsgReappear(testId, currentTurnId, posIndex, Math.max(waitMs * 10, 1200));
           waitMs = Math.min(waitMs * 1.5, 1000);
         } else {
           waitMs = 120;

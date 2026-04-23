@@ -1,75 +1,115 @@
 # ChatGit
 
-> **Visualize and navigate the ChatGPT conversation tree.**  
-> Jump across branches instantly — no more getting lost in long, forked chats.
+> Visualize, restore, and navigate ChatGPT conversation branches in Chrome and Firefox.
 
-## Features
+## Overview
 
-- **Tree visualization** — renders your full conversation tree with branch connectors
-- **Active path highlight** — the current live path is always highlighted
-- **Branch navigation** — click any node to jump to it, automatically switching reply versions along the way
-- **Branch count indicator** — subtle `current/total` tag on branching nodes
-- **Debug mode** — toggleable log panel with pause/copy for diagnostics
-- **Persistent cache** — tree state is saved per conversation in `localStorage`
+The project uses one shared content-script implementation with browser-specific manifests and generated builds for:
+
+- `dist/chrome/`
+- `dist/firefox/`
+
+Source of truth lives in:
+
+- `src/content.js`
+- `src/content.css`
+- `src/manifests/manifest.chrome.json`
+- `src/manifests/manifest.firefox.json`
+
+Static assets live in:
+
+- `src/assets/`
+
+## Build
+
+Build both browser targets with:
+
+```bash
+npm run build
+```
+
+or:
+
+```bash
+bash build.sh
+```
+
+The build script:
+
+- copies `src/content.js` and `src/content.css`
+- copies everything under `src/assets/`
+- writes browser-specific `manifest.json`
+
+Do not edit files under `dist/` directly.
 
 ## Install
 
 ### Chrome / Edge
 
-1. Go to `chrome://extensions` → enable **Developer mode**
-2. Click **Load unpacked** → select the `dist/chrome/` folder
+1. Open `chrome://extensions`
+2. Enable `Developer mode`
+3. Click `Load unpacked`
+4. Select `dist/chrome/`
 
 ### Firefox
 
-1. Go to `about:debugging` → **This Firefox** → **Load Temporary Add-on**
-2. Select `dist/firefox/manifest.json`
+1. Open `about:debugging`
+2. Choose `This Firefox`
+3. Click `Load Temporary Add-on`
+4. Select `dist/firefox/manifest.json`
 
-## Development
+## Project Structure
 
-Edit files in `src/` only. Run the build script to sync to both browser targets:
-
-```bash
-# Sync src → dist (both browsers)
-bash build.sh
-
-# Sync + create release zips
-bash build.sh --zip
+```text
+ChatGIT/
+|-- src/
+|   |-- content.js
+|   |-- content.css
+|   |-- assets/
+|   |   `-- icons/
+|   `-- manifests/
+|       |-- manifest.chrome.json
+|       `-- manifest.firefox.json
+|-- scripts/
+|   `-- build.mjs
+|-- dist/
+|   |-- chrome/
+|   `-- firefox/
+|-- build.sh
+|-- package.json
+`-- README.md
 ```
 
-### Project Structure
+## Runtime Design
 
-```
-chatgit/
-├── src/                  # Single source of truth
-│   ├── content.js        # Extension logic
-│   ├── content.css       # UI styles
-│   ├── icon16.png
-│   ├── icon48.png
-│   └── icon128.png
-├── dist/
-│   ├── chrome/           # Chrome/Edge build (load this folder)
-│   │   ├── manifest.json
-│   │   ├── content.js    # copied by build.sh
-│   │   ├── content.css   # copied by build.sh
-│   │   └── icons/
-│   └── firefox/          # Firefox build
-│       ├── manifest.json
-│       ├── content.js    # copied by build.sh
-│       ├── content.css   # copied by build.sh
-│       └── icons/
-├── build.sh
-├── .gitignore
-└── README.md
-```
+### Stable branch navigation
 
-## How It Works
+The extension no longer relies on fragile "find the nearest button and click it" behavior as the main strategy.
 
-Each user turn in the conversation is a tree node. When a message has been edited (creating multiple reply versions), the tree branches. The extension:
+Current navigation flow:
 
-1. **Captures** all visible user turns on each DOM mutation
-2. **Assigns stable IDs** using `data-testid` (position-based, survives version switches)
-3. **Navigates** by walking the ancestor chain, switching reply versions at each branching point, then cycling the target's own version selector if needed
+- use `data-testid` like `conversation-turn-7` as the stable position identifier
+- build a page-level reply switcher index that maps each turn to its version switcher
+- read branch/version state from that index first
+- use scored button selection as fallback instead of "first matching button wins"
+- keep a final DOM-based fallback only as a safety net
 
-## Debug Mode
+This makes branch restoration more robust when:
 
-Click **调试** in the panel header to open the live log panel. Use **⏸** to pause scrolling and **📋** to copy the full log.
+- `data-message-id` changes across versions
+- `1/2` and `2/2` text shifts visually
+- nearby turns have similar `Previous response` / `Next response` buttons
+
+### Theme and overlay behavior
+
+The content UI also includes:
+
+- automatic light/dark theme detection
+- status toast attached to the extension root instead of floating over the page body
+- pointer-event isolation so native ChatGPT controls remain hoverable and clickable
+
+## Maintenance Notes
+
+- `scripts/build.mjs` is the single build entry for both browsers.
+- If you add more extension surfaces later, such as `background`, `popup`, or `options`, extend the build script instead of hand-editing `dist/`.
+- If branch navigation regresses again, start by checking the reply switcher index and scored fallback in `src/content.js`.
