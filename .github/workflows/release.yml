@@ -24,6 +24,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
       - name: Validate release version
         run: |
           node - <<'NODE'

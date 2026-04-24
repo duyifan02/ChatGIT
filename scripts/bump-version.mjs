@@ -14,8 +14,13 @@ const files = [
 ];
 
 for (const file of files) {
-  const json = JSON.parse(readFileSync(file, "utf8"));
-  json.version = version;
-  writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`, "utf8");
-  console.log(`Updated ${file} -> ${version}`);
+  try {
+    const json = JSON.parse(readFileSync(file, "utf8"));
+    json.version = version;
+    writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`, "utf8");
+    console.log(`Updated ${file} -> ${version}`);
+  } catch (error) {
+    console.error(`Failed to update ${file}: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
 }
