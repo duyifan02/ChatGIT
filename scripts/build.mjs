@@ -9,7 +9,7 @@ const distDir = join(rootDir, "dist");
 const assetsDir = join(srcDir, "assets");
 const manifestsDir = join(srcDir, "manifests");
 const launcherLogoSvgPath = join(assetsDir, "icons", "logo-source.svg");
-const launcherSvgToken = "\"__CGHL_LAUNCHER_SVG__\"";
+const launcherSvgDeclaration = "const INJECTED_LAUNCHER_SVG = null;";
 
 const browsers = [
   { name: "chrome", manifestFile: "manifest.chrome.json" },
@@ -50,9 +50,7 @@ function normalizeSvg(svgSource) {
     .replace(/<\?xml[\s\S]*?\?>/gi, "")
     .replace(/<!doctype[\s\S]*?>/gi, "")
     .trim()
-    // Keep markup readable while ensuring one-line safe JS string injection.
-    .replace(/\r?\n/g, " ")
-    .replace(/\s{2,}/g, " ");
+    .replace(/>\s+</g, "><");
 }
 
 function getLauncherSvgMarkup() {
@@ -64,7 +62,11 @@ function buildContentScript() {
   const contentScriptSource = readText(join(srcDir, "content.js"));
   const launcherSvg = getLauncherSvgMarkup();
   if (!launcherSvg) return contentScriptSource;
-  return contentScriptSource.replaceAll(launcherSvgToken, JSON.stringify(launcherSvg));
+  const nextContentScript = contentScriptSource.replace(
+    launcherSvgDeclaration,
+    `const INJECTED_LAUNCHER_SVG = ${JSON.stringify(launcherSvg)};`
+  );
+  return nextContentScript.includes(launcherSvgDeclaration) ? contentScriptSource : nextContentScript;
 }
 
 function buildBrowser(browser) {
