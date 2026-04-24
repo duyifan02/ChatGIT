@@ -50,6 +50,7 @@ function normalizeSvg(svgSource) {
     .replace(/<\?xml[\s\S]*?\?>/gi, "")
     .replace(/<!doctype[\s\S]*?>/gi, "")
     .trim()
+    // Keep markup readable while ensuring one-line safe JS string injection.
     .replace(/\r?\n/g, " ")
     .replace(/\s{2,}/g, " ");
 }
@@ -63,7 +64,7 @@ function buildContentScript() {
   const contentScriptSource = readText(join(srcDir, "content.js"));
   const launcherSvg = getLauncherSvgMarkup();
   if (!launcherSvg) return contentScriptSource;
-  return contentScriptSource.replace(launcherSvgToken, JSON.stringify(launcherSvg));
+  return contentScriptSource.replaceAll(launcherSvgToken, JSON.stringify(launcherSvg));
 }
 
 function buildBrowser(browser) {

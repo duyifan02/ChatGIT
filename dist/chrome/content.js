@@ -84,7 +84,7 @@
   }
 
   function getLauncherSvgMarkup() {
-    return LAUNCHER_SVG === "__CGHL_LAUNCHER_SVG__" ? DEFAULT_LAUNCHER_SVG : LAUNCHER_SVG;
+    return LAUNCHER_SVG === "<svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"> <circle cx=\"8\" cy=\"3\" r=\"1.5\" fill=\"currentColor\" opacity=\"0.9\" /> <circle cx=\"4.5\" cy=\"11\" r=\"1.5\" fill=\"currentColor\" opacity=\"0.7\" /> <circle cx=\"11.5\" cy=\"11\" r=\"1.5\" fill=\"currentColor\" opacity=\"0.7\" /> <path d=\"M8 4.5V7.5L4.5 9.5\" stroke=\"currentColor\" stroke-width=\"1.2\" stroke-linecap=\"round\" /> <path d=\"M8 7.5L11.5 9.5\" stroke=\"currentColor\" stroke-width=\"1.2\" stroke-linecap=\"round\" /> </svg>" ? DEFAULT_LAUNCHER_SVG : LAUNCHER_SVG;
   }
 
   function hasText(el) {
