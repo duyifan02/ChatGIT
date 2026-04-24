@@ -37,6 +37,15 @@
   const URL_CHANGE_EVENT = "cghl-url-change";
   const THEME_CHECK_EVENT = "cghl-theme-check";
   const DEBUG_MAX_LOG = 500;
+  const DEFAULT_LAUNCHER_SVG =
+    '<svg width="16" height="16" viewBox="0 0 16 16" fill="none">' +
+    '<circle cx="8" cy="3" r="1.5" fill="currentColor" opacity="0.9"/>' +
+    '<circle cx="4.5" cy="11" r="1.5" fill="currentColor" opacity="0.7"/>' +
+    '<circle cx="11.5" cy="11" r="1.5" fill="currentColor" opacity="0.7"/>' +
+    '<path d="M8 4.5V7.5L4.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
+    '<path d="M8 7.5L11.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
+    "</svg>";
+  const LAUNCHER_SVG = "__CGHL_LAUNCHER_SVG__";
 
   /* ═══════════════════════════════════════════════
      Utilities
@@ -72,6 +81,10 @@
       out.push(el);
     }
     return out;
+  }
+
+  function getLauncherSvgMarkup() {
+    return LAUNCHER_SVG === "__CGHL_LAUNCHER_SVG__" ? DEFAULT_LAUNCHER_SVG : LAUNCHER_SVG;
   }
 
   function hasText(el) {
@@ -480,13 +493,8 @@
       this.launcher.type = "button";
       this.launcher.innerHTML =
         '<span class="cghl-launcher-icon">' +
-        '<svg width="16" height="16" viewBox="0 0 16 16" fill="none">' +
-        '<circle cx="8" cy="3" r="1.5" fill="currentColor" opacity="0.9"/>' +
-        '<circle cx="4.5" cy="11" r="1.5" fill="currentColor" opacity="0.7"/>' +
-        '<circle cx="11.5" cy="11" r="1.5" fill="currentColor" opacity="0.7"/>' +
-        '<path d="M8 4.5V7.5L4.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
-        '<path d="M8 7.5L11.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>' +
-        '</svg></span>' +
+        getLauncherSvgMarkup() +
+        "</span>" +
         '<span>对话树</span>' +
         '<span id="cghl-launcher-count">0</span>';
 

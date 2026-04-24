@@ -8,6 +8,8 @@ const srcDir = join(rootDir, "src");
 const distDir = join(rootDir, "dist");
 const assetsDir = join(srcDir, "assets");
 const manifestsDir = join(srcDir, "manifests");
+const launcherLogoSvgPath = join(assetsDir, "icons", "logo-source.svg");
+const launcherSvgToken = "\"__CGHL_LAUNCHER_SVG__\"";
 
 const browsers = [
   { name: "chrome", manifestFile: "manifest.chrome.json" },
@@ -34,15 +36,41 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+function readText(path) {
+  return readFileSync(path, "utf8");
+}
+
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function normalizeSvg(svgSource) {
+  return svgSource
+    .replace(/^\uFEFF/, "")
+    .replace(/<\?xml[\s\S]*?\?>/gi, "")
+    .replace(/<!doctype[\s\S]*?>/gi, "")
+    .trim()
+    .replace(/\r?\n/g, " ")
+    .replace(/\s{2,}/g, " ");
+}
+
+function getLauncherSvgMarkup() {
+  if (!existsSync(launcherLogoSvgPath)) return null;
+  return normalizeSvg(readText(launcherLogoSvgPath));
+}
+
+function buildContentScript() {
+  const contentScriptSource = readText(join(srcDir, "content.js"));
+  const launcherSvg = getLauncherSvgMarkup();
+  if (!launcherSvg) return contentScriptSource;
+  return contentScriptSource.replace(launcherSvgToken, JSON.stringify(launcherSvg));
 }
 
 function buildBrowser(browser) {
   const outDir = join(distDir, browser.name);
   cleanDir(outDir);
 
-  copyIfExists(join(srcDir, "content.js"), join(outDir, "content.js"));
+  writeFileSync(join(outDir, "content.js"), buildContentScript(), "utf8");
   copyIfExists(join(srcDir, "content.css"), join(outDir, "content.css"));
 
   if (existsSync(assetsDir)) {

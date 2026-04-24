@@ -19,6 +19,7 @@ Source of truth lives in:
 Static assets live in:
 
 - `src/assets/`
+- launcher logo SVG source: `src/assets/icons/logo-source.svg`
 
 ## Build
 
@@ -38,6 +39,7 @@ The build script:
 
 - copies `src/content.js` and `src/content.css`
 - copies everything under `src/assets/`
+- injects `src/assets/icons/logo-source.svg` into the launcher icon in `content.js`
 - writes browser-specific `manifest.json`
 
 Do not edit files under `dist/` directly.
