@@ -6,6 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:chrome": "node scripts/build.mjs",
-    "build:firefox": "node scripts/build.mjs"
+    "build:firefox": "node scripts/build.mjs",
+    "bump": "node scripts/bump-version.mjs"
   }
 }

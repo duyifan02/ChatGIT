@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish extension release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Validate release version
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+
+          const tag = process.env.GITHUB_REF_NAME;
+          const version = tag.replace(/^v/, "");
+
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const chrome = JSON.parse(fs.readFileSync("src/manifests/manifest.chrome.json", "utf8"));
+          const firefox = JSON.parse(fs.readFileSync("src/manifests/manifest.firefox.json", "utf8"));
+
+          const mismatches = [];
+          if (pkg.version !== version) mismatches.push(`package.json version=${pkg.version}`);
+          if (chrome.version !== version) mismatches.push(`chrome manifest version=${chrome.version}`);
+          if (firefox.version !== version) mismatches.push(`firefox manifest version=${firefox.version}`);
+
+          if (mismatches.length) {
+            console.error(`Release tag ${tag} does not match:`);
+            for (const item of mismatches) console.error(`- ${item}`);
+            process.exit(1);
+          }
+
+          console.log(`Version OK: ${version}`);
+          NODE
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Pack release assets
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p release
+
+          cd dist/chrome
+          zip -r "../../release/chatgit-chrome-${VERSION}.zip" .
+          cd ../..
+
+          cd dist/firefox
+          zip -r "../../release/chatgit-firefox-${VERSION}.zip" .
+          cd ../..
+
+          cd release
+          sha256sum *.zip > SHA256SUMS.txt
+          cd ..
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PROJECT_NAME="$(node -p "JSON.parse(require('fs').readFileSync('src/manifests/manifest.chrome.json','utf8')).name")"
+          gh release create "$GITHUB_REF_NAME" \
+            release/*.zip \
+            release/SHA256SUMS.txt \
+            --title "${PROJECT_NAME} $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag
