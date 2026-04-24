@@ -82,9 +82,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          PROJECT_NAME="$(node -p "JSON.parse(require('fs').readFileSync('src/manifests/manifest.chrome.json','utf8')).name")"
           gh release create "$GITHUB_REF_NAME" \
             release/*.zip \
             release/SHA256SUMS.txt \
-            --title "ChatGit $GITHUB_REF_NAME" \
+            --title "${PROJECT_NAME} $GITHUB_REF_NAME" \
             --generate-notes \
             --verify-tag

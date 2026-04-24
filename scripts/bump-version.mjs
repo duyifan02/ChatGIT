@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const version = process.argv[2];
 
 if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
-  console.error("Usage: node scripts/bump-version.mjs 1.2.3");
+  console.error("Usage: npm run bump -- 1.2.3 (or: node scripts/bump-version.mjs 1.2.3)");
   process.exit(1);
 }
 
