@@ -15,12 +15,20 @@ const files = [
 
 for (const file of files) {
   try {
-    const json = JSON.parse(readFileSync(file, "utf8"));
+    const raw = readFileSync(file, "utf8");
+    let json;
+    try {
+      json = JSON.parse(raw);
+    } catch (error) {
+      console.error(`Failed to parse JSON in ${file}: ${error instanceof Error ? error.message : String(error)}`);
+      process.exit(1);
+    }
+
     json.version = version;
     writeFileSync(file, `${JSON.stringify(json, null, 2)}\n`, "utf8");
     console.log(`Updated ${file} -> ${version}`);
   } catch (error) {
-    console.error(`Failed to update ${file}: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`Failed to read/write ${file}: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
 }
