@@ -11,6 +11,7 @@ The project uses one shared content-script implementation with browser-specific 
 
 Source of truth lives in:
 
+- `logo.svg`
 - `src/content.js`
 - `src/content.css`
 - `src/manifests/manifest.chrome.json`
@@ -19,6 +20,7 @@ Source of truth lives in:
 Static assets live in:
 
 - `src/assets/`
+- Extension icon assets are generated from root `logo.svg` into `dist/*/icons/` during build.
 
 ## Build
 
@@ -66,7 +68,6 @@ ChatGIT/
 |   |-- content.js
 |   |-- content.css
 |   |-- assets/
-|   |   `-- icons/
 |   `-- manifests/
 |       |-- manifest.chrome.json
 |       `-- manifest.firefox.json
@@ -76,6 +77,7 @@ ChatGIT/
 |   |-- chrome/
 |   `-- firefox/
 |-- build.sh
+|-- logo.svg
 |-- package.json
 `-- README.md
 ```

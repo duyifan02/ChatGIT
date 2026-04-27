@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Resvg } from "@resvg/resvg-js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, "..");
@@ -8,6 +9,8 @@ const srcDir = join(rootDir, "src");
 const distDir = join(rootDir, "dist");
 const assetsDir = join(srcDir, "assets");
 const manifestsDir = join(srcDir, "manifests");
+const logoFile = join(rootDir, "logo.svg");
+const iconSizes = [16, 32, 48, 128];
 
 const browsers = [
   { name: "chrome", manifestFile: "manifest.chrome.json" },
@@ -38,6 +41,23 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function generateIcons(logoSvg, iconsOutDir) {
+  ensureDir(iconsOutDir);
+  copyIfExists(logoSvg, join(iconsOutDir, "logo.svg"));
+
+  const svg = readFileSync(logoSvg, "utf8");
+  for (const size of iconSizes) {
+    const resvg = new Resvg(svg, {
+      fitTo: {
+        mode: "width",
+        value: size
+      }
+    });
+    const pngData = resvg.render().asPng();
+    writeFileSync(join(iconsOutDir, `icon${size}.png`), pngData);
+  }
+}
+
 function buildBrowser(browser) {
   const outDir = join(distDir, browser.name);
   cleanDir(outDir);
@@ -49,11 +69,16 @@ function buildBrowser(browser) {
     cpSync(assetsDir, outDir, { recursive: true });
   }
 
+  generateIcons(logoFile, join(outDir, "icons"));
+
   const manifest = readJson(join(manifestsDir, browser.manifestFile));
   writeJson(join(outDir, "manifest.json"), manifest);
 }
 
 function main() {
+  if (!existsSync(logoFile)) {
+    throw new Error(`Missing logo source file: ${logoFile}`);
+  }
   ensureDir(distDir);
   for (const browser of browsers) {
     buildBrowser(browser);
