@@ -1,2 +1,4 @@
 node_modules/
+release/
 *.zip
+.DS_Store

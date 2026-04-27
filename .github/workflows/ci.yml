@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate extension build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check version consistency
+        run: npm run check:version
+
+      - name: Build extension
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          test -f dist/chrome/manifest.json
+          test -f dist/chrome/content.js
+          test -f dist/chrome/content.css
+
+          test -f dist/firefox/manifest.json
+          test -f dist/firefox/content.js
+          test -f dist/firefox/content.css
+
+          echo "Build output verified."

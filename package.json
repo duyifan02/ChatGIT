@@ -7,6 +7,15 @@
     "build": "node scripts/build.mjs",
     "build:chrome": "node scripts/build.mjs",
     "build:firefox": "node scripts/build.mjs",
-    "bump": "node scripts/bump-version.mjs"
+    "bump": "node scripts/bump-version.mjs",
+
+    "sync-version": "node scripts/sync-version.mjs",
+    "check:version": "node scripts/check-version.mjs",
+
+    "version": "npm run sync-version && git add package.json src/manifests/manifest.chrome.json src/manifests/manifest.firefox.json",
+
+    "release:patch": "npm version patch -m \"chore(release): v%s\" && git push origin main --follow-tags",
+    "release:minor": "npm version minor -m \"chore(release): v%s\" && git push origin main --follow-tags",
+    "release:major": "npm version major -m \"chore(release): v%s\" && git push origin main --follow-tags"
   }
 }

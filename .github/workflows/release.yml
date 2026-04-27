@@ -8,9 +8,13 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: Build and publish extension release
+    name: Build and publish release
     runs-on: ubuntu-latest
 
     steps:
@@ -24,39 +28,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-
-      - name: Validate release version
-        run: |
-          node - <<'NODE'
-          const fs = require("fs");
-
-          const tag = process.env.GITHUB_REF_NAME;
-          const version = tag.replace(/^v/, "");
-
-          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-          const chrome = JSON.parse(fs.readFileSync("src/manifests/manifest.chrome.json", "utf8"));
-          const firefox = JSON.parse(fs.readFileSync("src/manifests/manifest.firefox.json", "utf8"));
-
-          const mismatches = [];
-          if (pkg.version !== version) mismatches.push(`package.json version=${pkg.version}`);
-          if (chrome.version !== version) mismatches.push(`chrome manifest version=${chrome.version}`);
-          if (firefox.version !== version) mismatches.push(`firefox manifest version=${firefox.version}`);
-
-          if (mismatches.length) {
-            console.error(`Release tag ${tag} does not match:`);
-            for (const item of mismatches) console.error(`- ${item}`);
-            process.exit(1);
-          }
-
-          console.log(`Version OK: ${version}`);
-          NODE
+      - name: Check release version
+        run: npm run check:version
 
       - name: Build extension
         run: npm run build
@@ -64,6 +37,7 @@ jobs:
       - name: Pack release assets
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+
           mkdir -p release
 
           cd dist/chrome
@@ -78,14 +52,15 @@ jobs:
           sha256sum *.zip > SHA256SUMS.txt
           cd ..
 
+          ls -lh release
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PROJECT_NAME="$(node -p "JSON.parse(require('fs').readFileSync('src/manifests/manifest.chrome.json','utf8')).name")"
           gh release create "$GITHUB_REF_NAME" \
             release/*.zip \
             release/SHA256SUMS.txt \
-            --title "${PROJECT_NAME} $GITHUB_REF_NAME" \
+            --title "ChatGit $GITHUB_REF_NAME" \
             --generate-notes \
             --verify-tag
