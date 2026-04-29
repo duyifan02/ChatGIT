@@ -1521,10 +1521,13 @@
 
     getAllChildrenFlat(node) {
       if (!node) return [];
+      const seen = new Set();
       const children = [];
       const versions = Object.keys(node.childrenByVersion).map(Number).sort((a, b) => a - b);
       for (const v of versions) {
         for (const childKey of node.childrenByVersion[String(v)] || []) {
+          if (seen.has(childKey)) continue;
+          seen.add(childKey);
           const child = this.treeNodes.get(childKey);
           if (child) children.push(child);
         }
@@ -1547,24 +1550,142 @@
       });
       roots.sort((a, b) => (a.firstSeenOrder || 0) - (b.firstSeenOrder || 0));
 
-      const dfs = (node, guides) => {
+      const dfs = (node, guides, incomingKind) => {
         if (!node || visited.has(node.nodeKey)) return;
         visited.add(node.nodeKey);
 
-        result.push({ node, guides: guides.slice() });
-
         const children = this.getAllChildrenFlat(node);
-        for (let i = 0; i < children.length; i++) {
-          const isLast = i === children.length - 1;
-          dfs(children[i], [...guides, !isLast]);
+        const hasLinearChild = children.length === 1;
+        result.push({
+          node,
+          guides: guides.slice(),
+          branchDepth: guides.length,
+          incomingKind,
+          hasLinearChild,
+          hasBranches: children.length > 1
+        });
+
+        if (children.length === 1) {
+          // Non-branch nodes stay in the same column and continue vertically.
+          dfs(children[0], guides, "linear");
+        } else if (children.length > 1) {
+          // Real horizontal expansion only happens when a node actually branches.
+          for (let i = 0; i < children.length; i++) {
+            const isLast = i === children.length - 1;
+            dfs(children[i], [...guides, !isLast], isLast ? "elbow" : "branch");
+          }
         }
       };
 
       for (const root of roots) {
-        dfs(root, []);
+        dfs(root, [], "root");
       }
 
       return result;
+    }
+
+    createSvgElement(tag) {
+      return document.createElementNS("http://www.w3.org/2000/svg", tag);
+    }
+
+    appendTreePath(svg, d, active) {
+      if (!d) return;
+      const path = this.createSvgElement("path");
+      path.setAttribute("d", d);
+      path.setAttribute("class", active ? "cghl-tree-line is-active" : "cghl-tree-line");
+      svg.appendChild(path);
+    }
+
+    buildBranchOutPath(parentX, parentY, trunkX, radius) {
+      return [
+        `M ${parentX} ${parentY}`,
+        `L ${trunkX - radius} ${parentY}`,
+        `Q ${trunkX} ${parentY} ${trunkX} ${parentY + radius}`
+      ].join(" ");
+    }
+
+    buildBranchInPath(trunkX, childX, childY, radius) {
+      return [
+        `M ${trunkX} ${childY - radius}`,
+        `Q ${trunkX} ${childY} ${trunkX + radius} ${childY}`,
+        `L ${childX} ${childY}`
+      ].join(" ");
+    }
+
+    renderTreeConnections(tree, order, rowRefs, liveSet) {
+      const width = Math.ceil(tree.scrollWidth);
+      const height = Math.ceil(tree.scrollHeight);
+      if (!width || !height) return;
+
+      const svg = this.createSvgElement("svg");
+      svg.classList.add("cghl-tree-lines");
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      svg.setAttribute("width", String(width));
+      svg.setAttribute("height", String(height));
+      svg.setAttribute("aria-hidden", "true");
+
+      const meta = new Map();
+      for (const { node, branchDepth } of order) {
+        const row = rowRefs.get(node.nodeKey);
+        if (!row) continue;
+        meta.set(node.nodeKey, {
+          x: 12 + branchDepth * 20 + 3.5,
+          y: row.offsetTop + row.offsetHeight / 2,
+          branchDepth
+        });
+      }
+
+      for (const { node } of order) {
+        const parentMeta = meta.get(node.nodeKey);
+        if (!parentMeta) continue;
+
+        const children = this.getAllChildrenFlat(node).filter(child => meta.has(child.nodeKey));
+        if (children.length === 0) continue;
+
+        if (children.length === 1) {
+          const child = children[0];
+          const childMeta = meta.get(child.nodeKey);
+          if (!childMeta) continue;
+
+          const d = `M ${parentMeta.x} ${parentMeta.y} L ${childMeta.x} ${childMeta.y}`;
+          this.appendTreePath(svg, d, false);
+          if (liveSet.has(node.nodeKey) && liveSet.has(child.nodeKey)) {
+            this.appendTreePath(svg, d, true);
+          }
+          continue;
+        }
+
+        const childMetas = children
+          .map(child => ({ child, ...meta.get(child.nodeKey) }))
+          .sort((a, b) => a.y - b.y);
+
+        const trunkX = (parentMeta.x + childMetas[0].x) / 2;
+        const horizontalGap = Math.max(0, childMetas[0].x - trunkX);
+        const radius = Math.max(4, Math.min(8, horizontalGap - 1));
+        const trunkTop = parentMeta.y + radius;
+        const trunkBottom = childMetas[childMetas.length - 1].y - radius;
+
+        this.appendTreePath(svg, this.buildBranchOutPath(parentMeta.x, parentMeta.y, trunkX, radius), false);
+        if (trunkBottom > trunkTop) {
+          this.appendTreePath(svg, `M ${trunkX} ${trunkTop} L ${trunkX} ${trunkBottom}`, false);
+        }
+
+        for (const childMeta of childMetas) {
+          this.appendTreePath(svg, this.buildBranchInPath(trunkX, childMeta.x, childMeta.y, radius), false);
+        }
+
+        const activeChild = childMetas.find(childMeta => liveSet.has(node.nodeKey) && liveSet.has(childMeta.child.nodeKey));
+        if (activeChild) {
+          this.appendTreePath(svg, this.buildBranchOutPath(parentMeta.x, parentMeta.y, trunkX, radius), true);
+          const activeBottom = activeChild.y - radius;
+          if (activeBottom > trunkTop) {
+            this.appendTreePath(svg, `M ${trunkX} ${trunkTop} L ${trunkX} ${activeBottom}`, true);
+          }
+          this.appendTreePath(svg, this.buildBranchInPath(trunkX, activeChild.x, activeChild.y, radius), true);
+        }
+      }
+
+      tree.insertBefore(svg, tree.firstChild);
     }
 
     /* ─── Signature (for render-diffing) ────────── */
@@ -1662,7 +1783,11 @@
         return;
       }
 
-      for (const { node, guides } of order) {
+      const tree = document.createElement("div");
+      tree.className = "cghl-tree";
+      const rowRefs = new Map();
+
+      for (const { node, branchDepth } of order) {
         const isActive = liveSet.has(node.nodeKey);
         const isCurrent = node.nodeKey === this.activeNodeKey;
 
@@ -1671,21 +1796,12 @@
         row.dataset.nodeKey = node.nodeKey;
         if (isActive) row.dataset.active = "";
         if (isCurrent) row.dataset.current = "";
+        row.style.setProperty("--cghl-indent-px", `${branchDepth * 20}px`);
 
         // ── Indent guides ──
         const indent = document.createElement("div");
         indent.className = "cghl-indent";
-
-        for (let i = 0; i < guides.length; i++) {
-          const g = document.createElement("span");
-          g.className = "cghl-guide";
-          if (i < guides.length - 1) {
-            g.classList.add(guides[i] ? "cghl-guide--pipe" : "cghl-guide--empty");
-          } else {
-            g.classList.add(guides[i] ? "cghl-guide--branch" : "cghl-guide--elbow");
-          }
-          indent.appendChild(g);
-        }
+        indent.style.width = `${branchDepth * 20}px`;
         row.appendChild(indent);
 
         // ── Dot ──
@@ -1727,10 +1843,13 @@
         }
 
         row.appendChild(info);
-        fragment.appendChild(row);
+        rowRefs.set(node.nodeKey, row);
+        tree.appendChild(row);
       }
 
+      fragment.appendChild(tree);
       this.list.appendChild(fragment);
+      this.renderTreeConnections(tree, order, rowRefs, liveSet);
       this.updateCounts(this.treeNodes.size);
     }
 

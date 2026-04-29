@@ -291,7 +291,7 @@
 #cghl-list {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   padding: 6px 0;
   scrollbar-width: thin;
   scrollbar-color: rgba(16, 163, 127, 0.15) transparent;
@@ -314,6 +314,13 @@
   background: rgba(16, 163, 127, 0.28);
 }
 
+.cghl-tree {
+  position: relative;
+  min-width: 100%;
+  width: max-content;
+  padding-right: 12px;
+}
+
 /* ═══════════════════════════════════════════════════
    Tree row + connector system
    ─────────────────────────────────────────────────
@@ -325,8 +332,12 @@
    ═══════════════════════════════════════════════════ */
 
 .cghl-row {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: stretch;          /* guides fill full row height */
+  min-width: 100%;
+  width: max-content;
   min-height: 36px;
   padding: 0 14px 0 12px;
   transition: background 180ms ease;
@@ -342,12 +353,6 @@
 .cghl-row[data-active] {
   background: var(--cghl-bg-active);
   border-left-color: var(--cghl-accent);
-  /* --gline NOT set here — ancestor guides stay neutral */
-}
-
-/* Only the direct connector (last guide in indent) highlights */
-.cghl-row[data-active] > .cghl-indent > .cghl-guide:last-child {
-  --gline: var(--cghl-line-active);
 }
 
 .cghl-row[data-current] {
@@ -355,82 +360,34 @@
   border-left-color: var(--cghl-accent-fg);
 }
 
-.cghl-row[data-current] > .cghl-indent > .cghl-guide:last-child {
-  --gline: var(--cghl-line-active);
-}
-
 /* ── Indent container ──────────────────────────── */
 
 .cghl-indent {
-  display: flex;
+  display: block;
   flex-shrink: 0;
-  align-self: stretch;           /* ensure guides get full height */
+  align-self: stretch;
 }
 
-/* ── Guide columns (tree connectors) ───────────── */
-
-.cghl-guide {
-  position: relative;
-  width: var(--cghl-guide-w);
-  flex-shrink: 0;
-  /* inherits stretch from parent → full row height */
-}
-
-/* │ pipe — full-height vertical continuation line */
-.cghl-guide--pipe::before {
-  content: "";
+.cghl-tree-lines {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--gline);
-  transition: background 180ms ease;
+  inset: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
 }
 
-/* (empty) — ancestor was last child, gap */
-.cghl-guide--empty {
-  /* intentionally blank */
+.cghl-tree-line {
+  fill: none;
+  stroke: var(--cghl-line);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
-/* ├ branch — vertical full-height + horizontal stub at center */
-.cghl-guide--branch::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--gline);
-  transition: background 180ms ease;
-}
-
-.cghl-guide--branch::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(50% + 2px);
-  height: 1px;
-  background: var(--gline);
-  transition: background 180ms ease;
-}
-
-/* └ elbow — L-shaped, top→center vertical + horizontal turn */
-.cghl-guide--elbow::before {
-  content: "";
-  position: absolute;
-  left: calc(50% - 0.5px);
-  top: 0;
-  height: 50%;
-  width: calc(50% + 2.5px);
-  border-left: 1px solid var(--gline);
-  border-bottom: 1px solid var(--gline);
-  border-bottom-left-radius: 8px;
-  background: none;
-  transition: border-color 180ms ease;
+.cghl-tree-line.is-active {
+  stroke: var(--cghl-line-active);
+  stroke-width: 1.7;
 }
 
 /* ── Tree dot ──────────────────────────────────── */
