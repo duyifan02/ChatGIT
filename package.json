@@ -1,6 +1,6 @@
 {
   "name": "chatgit-extension",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "private": true,
   "description": "Browser extension build scaffold for ChatGit.",
   "dependencies": {
