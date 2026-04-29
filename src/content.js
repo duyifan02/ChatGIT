@@ -513,6 +513,26 @@
         }
       });
 
+      this._tooltip = null;
+      this._tooltipTimer = null;
+      this._tooltipRow = null;
+
+      this.list.addEventListener("mouseover", e => {
+        const row = e.target.closest(".cghl-row");
+        if (!row || row === this._tooltipRow) return;
+        this._hideTooltip();
+        this._tooltipTimer = setTimeout(() => this._showTooltip(row), 260);
+        this._tooltipRow = row;
+      });
+
+      this.list.addEventListener("mouseout", e => {
+        const row = e.target.closest(".cghl-row");
+        if (!row) return;
+        const related = e.relatedTarget?.closest?.(".cghl-row");
+        if (related === row) return;
+        if (this._tooltipRow === row) this._hideTooltip();
+      });
+
       this.root.appendChild(this.status);
       this.root.appendChild(this.panel);
       this.root.appendChild(this.launcher);
@@ -525,6 +545,73 @@
       this.panelOpen = open;
       this.root.classList.toggle("is-open", open);
       if (open) this.scrollActiveIntoView();
+      if (!open) this._hideTooltip();
+    }
+
+    _getTooltipText(nodeKey) {
+      const msg = this.messages.find(m => m.nodeKey === nodeKey);
+      if (msg?.fullText) return msg.fullText;
+      const node = this.treeNodes.get(nodeKey);
+      return node?.fullText || node?.summary || "";
+    }
+
+    _showTooltip(row) {
+      const nodeKey = row.dataset.nodeKey;
+      if (!nodeKey) return;
+
+      const text = this._getTooltipText(nodeKey).trim();
+      if (!text) return;
+
+      const node = this.treeNodes.get(nodeKey);
+      const tooltip = document.createElement("div");
+      tooltip.className = "cghl-tooltip";
+
+      const body = document.createElement("div");
+      body.className = "cghl-tooltip-body";
+      body.textContent = text;
+      tooltip.appendChild(body);
+
+      if (node && node.replyVersionTotal > 1) {
+        const branchInfo = this.branchCache.get(node.turnId);
+        const currentV = branchInfo?.current || node.replyVersionCurrent || 1;
+        const meta = document.createElement("div");
+        meta.className = "cghl-tooltip-meta";
+        meta.textContent = `版本 ${currentV}/${node.replyVersionTotal}`;
+        tooltip.appendChild(meta);
+      }
+
+      this.root.appendChild(tooltip);
+
+      const panelRect = this.panel.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const ttRect = tooltip.getBoundingClientRect();
+      const pad = 12;
+
+      let left = panelRect.left - ttRect.width - pad;
+      if (left < pad) left = panelRect.right + pad;
+      if (left + ttRect.width > window.innerWidth - pad) left = Math.max(pad, window.innerWidth - ttRect.width - pad);
+
+      let top = rowRect.top;
+      if (top + ttRect.height > window.innerHeight - pad) {
+        top = window.innerHeight - ttRect.height - pad;
+      }
+      if (top < pad) top = pad;
+
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+      this._tooltip = tooltip;
+    }
+
+    _hideTooltip() {
+      if (this._tooltipTimer) {
+        clearTimeout(this._tooltipTimer);
+        this._tooltipTimer = null;
+      }
+      if (this._tooltip) {
+        this._tooltip.remove();
+        this._tooltip = null;
+      }
+      this._tooltipRow = null;
     }
 
     showStatus(text, persist) {
@@ -685,6 +772,7 @@
               parentNodeKey: n.parentNodeKey || null,
               parentSelectedVersion: n.parentSelectedVersion != null ? n.parentSelectedVersion : null,
               summary: n.summary || "",
+              fullText: n.fullText || "",
               replyVersionTotal: Math.max(1, n.replyVersionTotal || 1),
               replyVersionCurrent: Math.max(1, n.replyVersionCurrent || 1),
               childrenByVersion: n.childrenByVersion || {},
@@ -737,6 +825,7 @@
             parentNodeKey: n.parentNodeKey,
             parentSelectedVersion: n.parentSelectedVersion,
             summary: n.summary,
+            fullText: n.fullText,
             replyVersionTotal: n.replyVersionTotal,
             replyVersionCurrent: n.replyVersionCurrent,
             childrenByVersion: n.childrenByVersion,
@@ -1459,6 +1548,7 @@
             parentNodeKey: parentKey,
             parentSelectedVersion: parentVersion,
             summary: (msg.previewText || "").slice(0, 120),
+            fullText: msg.fullText || "",
             replyVersionTotal: msg.replyVersion?.total || 1,
             replyVersionCurrent: msg.replyVersion?.current || 1,
             childrenByVersion: {},
@@ -1472,6 +1562,7 @@
         } else {
           const node = this.treeNodes.get(nodeKey);
           node.summary = (msg.previewText || node.summary || "").slice(0, 120);
+          node.fullText = msg.fullText || node.fullText || "";
           node.messageId = msg.messageId || node.messageId;
           node.testId = msg.testId || node.testId;
           node.replyVersionTotal = Math.max(node.replyVersionTotal || 1, msg.replyVersion?.total || 1);
@@ -1728,6 +1819,7 @@
 
       this.messages = entries.map((entry, index) => {
         const top = elTopIn(entry.turnElement, sc);
+        const fullText = (entry.focusElement?.textContent || entry.turnElement?.textContent || "").trim();
         const previewText = (entry.focusElement?.textContent || entry.turnElement?.textContent || "")
           .trim()
           .replace(/\s+/g, " ");
@@ -1740,6 +1832,7 @@
           turnId: entry.turnId,
           testId: entry.testId || "",
           messageId: entry.messageId,
+          fullText,
           previewText,
           top,
           relative: clamp(top / scrollRange, 0, 1),
@@ -1767,6 +1860,7 @@
 
     renderTree() {
       if (!this.list) return;
+      this._hideTooltip();
       this.list.textContent = "";
 
       const order = this.computeRenderOrder();
