@@ -32,11 +32,36 @@
 
   const PAGE_RE = /https:\/\/(chatgpt\.com|chat\.openai\.com)\//;
   const STORAGE_PREFIX = "cghl:";
+  const SETTINGS_KEY = `${STORAGE_PREFIX}settings:v1`;
   const THROTTLE_MS = 120;
   const SCROLL_ANCHOR = 0.28;
   const URL_CHANGE_EVENT = "cghl-url-change";
   const THEME_CHECK_EVENT = "cghl-theme-check";
   const DEBUG_MAX_LOG = 500;
+  const DEFAULT_BRANCH_THEME_ID = "aurora";
+  const BRANCH_COLOR_THEMES = {
+    aurora: {
+      label: "极光",
+      dark: ["#19c37d", "#38bdf8", "#818cf8", "#f472b6"],
+      light: ["#0f9f78", "#0f7cc1", "#6d5dfc", "#c92f7c"]
+    },
+    tide: {
+      label: "深海",
+      dark: ["#22d3ee", "#2563eb", "#312e81", "#020617"],
+      light: ["#06b6d4", "#2563eb", "#4338ca", "#1e293b"]
+    },
+    ember: {
+      label: "电光",
+      dark: ["#f8fafc", "#a78bfa", "#7c3aed", "#0f172a"],
+      light: ["#e2e8f0", "#8b5cf6", "#6d28d9", "#111827"]
+    },
+    moss: {
+      label: "夕照",
+      dark: ["#fde68a", "#fb7185", "#ea580c", "#7c2d12"],
+      light: ["#f59e0b", "#ef4444", "#c2410c", "#7c2d12"]
+    }
+  };
+  const BRANCH_THEME_IDS = Object.keys(BRANCH_COLOR_THEMES);
 
   /* ═══════════════════════════════════════════════
      Utilities
@@ -134,6 +159,46 @@
     return clamp(Number(token), 0, 255);
   }
 
+  function hexToRgb(hex) {
+    const normalized = String(hex || "").trim().replace(/^#/, "");
+    if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(normalized)) {
+      return { r: 255, g: 255, b: 255 };
+    }
+    const full = normalized.length === 3
+      ? normalized.split("").map(ch => ch + ch).join("")
+      : normalized;
+    return {
+      r: parseInt(full.slice(0, 2), 16),
+      g: parseInt(full.slice(2, 4), 16),
+      b: parseInt(full.slice(4, 6), 16)
+    };
+  }
+
+  function mixRgb(a, b, t) {
+    const ratio = clamp(Number(t) || 0, 0, 1);
+    return {
+      r: Math.round(a.r + (b.r - a.r) * ratio),
+      g: Math.round(a.g + (b.g - a.g) * ratio),
+      b: Math.round(a.b + (b.b - a.b) * ratio)
+    };
+  }
+
+  function sampleGradient(stops, t) {
+    if (!Array.isArray(stops) || stops.length === 0) return { r: 255, g: 255, b: 255 };
+    if (stops.length === 1) return stops[0];
+    const ratio = clamp(Number(t) || 0, 0, 1);
+    const scaled = ratio * (stops.length - 1);
+    const index = Math.min(stops.length - 2, Math.floor(scaled));
+    const localT = scaled - index;
+    return mixRgb(stops[index], stops[index + 1], localT);
+  }
+
+  function rgbToCss(rgb, alpha = 1) {
+    const a = clamp(Number(alpha), 0, 1);
+    if (a >= 0.999) return `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+  }
+
   function luminanceFromColor(color) {
     if (!color) return null;
     const normalized = color.trim().toLowerCase();
@@ -224,6 +289,7 @@
       this.lastSignature = "";
       this.nodeSeq = 0;
       this.theme = "dark";
+      this.branchColorThemeId = DEFAULT_BRANCH_THEME_ID;
       this.themeObserver = null;
       this.themeMedia = null;
 
@@ -247,6 +313,9 @@
       this.launcherCount = null;
       this.status = null;
       this.harvestBtn = null;
+      this.branchThemeBtn = null;
+      this.branchThemeWrap = null;
+      this.branchThemeMenu = null;
 
       // Timers
       this.persistTimer = null;
@@ -267,6 +336,7 @@
 
     init() {
       this.loadCache();
+      this.loadSettings();
       this.injectUI();
       this.applyTheme(this.detectTheme());
       this.attachEvents();
@@ -378,8 +448,13 @@
         this.launcherCount = document.getElementById("cghl-launcher-count");
         this.status = document.getElementById("cghl-status");
         this.harvestBtn = document.getElementById("cghl-harvest");
+        this.branchThemeWrap = document.getElementById("cghl-branch-theme-wrap");
+        this.branchThemeBtn = document.getElementById("cghl-branch-theme");
+        this.branchThemeMenu = document.getElementById("cghl-branch-theme-menu");
         this.debugPanel = document.getElementById("cghl-debug-panel");
         this.debugToggleBtn = document.getElementById("cghl-debug-toggle");
+        this.updateBranchThemeButton();
+        this.renderBranchThemeMenu();
         return;
       }
 
@@ -427,9 +502,33 @@
         this.toggleDebug();
       });
 
+      this.branchThemeWrap = document.createElement("div");
+      this.branchThemeWrap.id = "cghl-branch-theme-wrap";
+
+      this.branchThemeBtn = document.createElement("button");
+      this.branchThemeBtn.id = "cghl-branch-theme";
+      this.branchThemeBtn.type = "button";
+      this.branchThemeBtn.setAttribute("aria-haspopup", "menu");
+      this.branchThemeBtn.setAttribute("aria-expanded", "false");
+      this.branchThemeBtn.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleBranchThemeMenu();
+      });
+
+      this.branchThemeMenu = document.createElement("div");
+      this.branchThemeMenu.id = "cghl-branch-theme-menu";
+      this.branchThemeMenu.setAttribute("role", "menu");
+
+      this.branchThemeWrap.appendChild(this.branchThemeBtn);
+      this.branchThemeWrap.appendChild(this.branchThemeMenu);
+      this.updateBranchThemeButton();
+      this.renderBranchThemeMenu();
+
       header.appendChild(title);
       header.appendChild(this.countBadge);
       header.appendChild(this.harvestBtn);
+      header.appendChild(this.branchThemeWrap);
       header.appendChild(this.debugToggleBtn);
 
       // List
@@ -546,6 +645,7 @@
       this.root.classList.toggle("is-open", open);
       if (open) this.scrollActiveIntoView();
       if (!open) this._hideTooltip();
+      if (!open) this.closeBranchThemeMenu();
     }
 
     _getTooltipText(nodeKey) {
@@ -665,10 +765,15 @@
       this.theme = theme === "light" ? "light" : "dark";
       if (this.root) this.root.dataset.theme = this.theme;
       if (this.status) this.status.dataset.theme = this.theme;
+      this.updateBranchThemeButton();
+      this.renderBranchThemeMenu();
     }
 
     refreshTheme() {
-      this.applyTheme(this.detectTheme());
+      const nextTheme = this.detectTheme();
+      if (nextTheme === this.theme) return;
+      this.applyTheme(nextTheme);
+      if (this.list) this.renderTree();
     }
 
     /* ─── Events ────────────────────────────────── */
@@ -699,9 +804,15 @@
         });
       }
       document.addEventListener("click", e => {
+        if (this.branchThemeWrap && !this.branchThemeWrap.contains(e.target)) {
+          this.closeBranchThemeMenu();
+        }
         if (this.root && !this.root.contains(e.target)) {
           this.setPanelOpen(false);
         }
+      });
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape") this.closeBranchThemeMenu();
       });
     }
 
@@ -746,6 +857,142 @@
     cacheKey(kind) {
       const path = `${location.origin}${location.pathname}`.replace(/\/+$/, "") || location.origin;
       return `${STORAGE_PREFIX}${kind}:${path}`;
+    }
+
+    loadSettings() {
+      try {
+        const raw = window.localStorage.getItem(SETTINGS_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== "object") return;
+        if (BRANCH_COLOR_THEMES[data.branchColorThemeId]) {
+          this.branchColorThemeId = data.branchColorThemeId;
+        }
+      } catch (_e) {
+        this.log("settings", "Settings load failed: " + _e.message);
+      }
+    }
+
+    saveSettings() {
+      try {
+        window.localStorage.setItem(
+          SETTINGS_KEY,
+          JSON.stringify({ branchColorThemeId: this.branchColorThemeId })
+        );
+      } catch (_e) {
+        this.log("settings", "Settings save failed: " + _e.message);
+      }
+    }
+
+    updateBranchThemeButton() {
+      const theme = BRANCH_COLOR_THEMES[this.branchColorThemeId] || BRANCH_COLOR_THEMES[DEFAULT_BRANCH_THEME_ID];
+      if (this.branchThemeBtn) {
+        this.branchThemeBtn.innerHTML = "";
+        const label = document.createElement("span");
+        label.className = "cghl-theme-trigger-label";
+        label.textContent = theme.label;
+        const preview = document.createElement("span");
+        preview.className = "cghl-theme-trigger-preview";
+        const gradientStops = this.theme === "light" ? theme.light : theme.dark;
+        preview.style.background = `linear-gradient(90deg, ${gradientStops.join(", ")})`;
+        const chevron = document.createElement("span");
+        chevron.className = "cghl-theme-trigger-chevron";
+        chevron.textContent = "▾";
+        this.branchThemeBtn.appendChild(label);
+        this.branchThemeBtn.appendChild(preview);
+        this.branchThemeBtn.appendChild(chevron);
+        this.branchThemeBtn.title = `分支渐变主题：${theme.label}，点击切换`;
+      }
+      if (this.root) this.root.dataset.branchTheme = this.branchColorThemeId;
+    }
+
+    renderBranchThemeMenu() {
+      if (!this.branchThemeMenu) return;
+      this.branchThemeMenu.textContent = "";
+      const fragment = document.createDocumentFragment();
+
+      for (const themeId of BRANCH_THEME_IDS) {
+        const theme = BRANCH_COLOR_THEMES[themeId];
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "cghl-theme-option";
+        option.setAttribute("role", "menuitemradio");
+        option.setAttribute("aria-checked", themeId === this.branchColorThemeId ? "true" : "false");
+        if (themeId === this.branchColorThemeId) option.dataset.active = "";
+        option.addEventListener("click", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.setBranchTheme(themeId);
+          this.closeBranchThemeMenu();
+        });
+
+        const preview = document.createElement("span");
+        preview.className = "cghl-theme-option-preview";
+        const gradientStops = this.theme === "light" ? theme.light : theme.dark;
+        preview.style.background = `linear-gradient(90deg, ${gradientStops.join(", ")})`;
+
+        const meta = document.createElement("span");
+        meta.className = "cghl-theme-option-meta";
+
+        const name = document.createElement("span");
+        name.className = "cghl-theme-option-name";
+        name.textContent = theme.label;
+
+        const desc = document.createElement("span");
+        desc.className = "cghl-theme-option-desc";
+        desc.textContent = `${gradientStops.length} 色渐变`;
+
+        meta.appendChild(name);
+        meta.appendChild(desc);
+
+        const check = document.createElement("span");
+        check.className = "cghl-theme-option-check";
+        check.textContent = themeId === this.branchColorThemeId ? "✓" : "";
+
+        option.appendChild(preview);
+        option.appendChild(meta);
+        option.appendChild(check);
+        fragment.appendChild(option);
+      }
+
+      this.branchThemeMenu.appendChild(fragment);
+    }
+
+    openBranchThemeMenu() {
+      if (!this.branchThemeWrap || !this.branchThemeBtn || !this.branchThemeMenu) return;
+      this.branchThemeWrap.dataset.open = "";
+      this.branchThemeBtn.setAttribute("aria-expanded", "true");
+      this.renderBranchThemeMenu();
+    }
+
+    closeBranchThemeMenu() {
+      if (!this.branchThemeWrap || !this.branchThemeBtn) return;
+      delete this.branchThemeWrap.dataset.open;
+      this.branchThemeBtn.setAttribute("aria-expanded", "false");
+    }
+
+    toggleBranchThemeMenu() {
+      if (this.branchThemeWrap?.dataset.open != null) {
+        this.closeBranchThemeMenu();
+      } else {
+        this.openBranchThemeMenu();
+      }
+    }
+
+    setBranchTheme(themeId, { persist = true, rerender = true } = {}) {
+      const nextThemeId = BRANCH_COLOR_THEMES[themeId] ? themeId : DEFAULT_BRANCH_THEME_ID;
+      this.branchColorThemeId = nextThemeId;
+      this.updateBranchThemeButton();
+      this.renderBranchThemeMenu();
+      if (persist) this.saveSettings();
+      if (rerender && this.list) this.renderTree();
+    }
+
+    cycleBranchTheme() {
+      const currentIndex = Math.max(0, BRANCH_THEME_IDS.indexOf(this.branchColorThemeId));
+      const nextId = BRANCH_THEME_IDS[(currentIndex + 1) % BRANCH_THEME_IDS.length];
+      this.setBranchTheme(nextId);
+      this.showStatus(`分支主题：${BRANCH_COLOR_THEMES[nextId].label}`, false);
     }
 
     loadCache() {
@@ -1675,15 +1922,49 @@
       return result;
     }
 
+    buildBranchColorScale(order) {
+      const maxDepth = order.reduce((max, item) => Math.max(max, item.branchDepth || 0), 0);
+      const theme = BRANCH_COLOR_THEMES[this.branchColorThemeId] || BRANCH_COLOR_THEMES[DEFAULT_BRANCH_THEME_ID];
+      const stops = (this.theme === "light" ? theme.light : theme.dark).map(hexToRgb);
+      const lineAlpha = this.theme === "light" ? 0.36 : 0.44;
+      const dotFillAlpha = this.theme === "light" ? 0.08 : 0.14;
+      const dotStrokeAlpha = this.theme === "light" ? 0.56 : 0.48;
+      const glowAlpha = this.theme === "light" ? 0.24 : 0.34;
+      const activeGlowAlpha = this.theme === "light" ? 0.32 : 0.42;
+      const contrastRgb = this.theme === "light"
+        ? { r: 12, g: 18, b: 28 }
+        : { r: 255, g: 255, b: 255 };
+      const scale = new Map();
+
+      for (let depth = 0; depth <= maxDepth; depth++) {
+        const t = maxDepth === 0 ? 0 : depth / maxDepth;
+        const rgb = sampleGradient(stops, t);
+        const currentRgb = mixRgb(rgb, contrastRgb, 0.18);
+        scale.set(depth, {
+          line: rgbToCss(rgb, lineAlpha),
+          lineActive: rgbToCss(rgb, 0.96),
+          dotFill: rgbToCss(rgb, dotFillAlpha),
+          dotStroke: rgbToCss(rgb, dotStrokeAlpha),
+          dotActive: rgbToCss(rgb, 1),
+          dotCurrent: rgbToCss(currentRgb, 1),
+          glow: rgbToCss(rgb, glowAlpha),
+          activeGlow: rgbToCss(rgb, activeGlowAlpha)
+        });
+      }
+
+      return scale;
+    }
+
     createSvgElement(tag) {
       return document.createElementNS("http://www.w3.org/2000/svg", tag);
     }
 
-    appendTreePath(svg, d, active) {
+    appendTreePath(svg, d, stroke, active) {
       if (!d) return;
       const path = this.createSvgElement("path");
       path.setAttribute("d", d);
       path.setAttribute("class", active ? "cghl-tree-line is-active" : "cghl-tree-line");
+      path.setAttribute("stroke", stroke);
       svg.appendChild(path);
     }
 
@@ -1703,7 +1984,7 @@
       ].join(" ");
     }
 
-    renderTreeConnections(tree, order, rowRefs, liveSet) {
+    renderTreeConnections(tree, order, rowRefs, liveSet, branchColorScale) {
       const width = Math.ceil(tree.scrollWidth);
       const height = Math.ceil(tree.scrollHeight);
       if (!width || !height) return;
@@ -1719,10 +2000,12 @@
       for (const { node, branchDepth } of order) {
         const row = rowRefs.get(node.nodeKey);
         if (!row) continue;
+        const colors = branchColorScale.get(branchDepth) || branchColorScale.get(0);
         meta.set(node.nodeKey, {
           x: 12 + branchDepth * 20 + 3.5,
           y: row.offsetTop + row.offsetHeight / 2,
-          branchDepth
+          branchDepth,
+          colors
         });
       }
 
@@ -1739,9 +2022,9 @@
           if (!childMeta) continue;
 
           const d = `M ${parentMeta.x} ${parentMeta.y} L ${childMeta.x} ${childMeta.y}`;
-          this.appendTreePath(svg, d, false);
+          this.appendTreePath(svg, d, childMeta.colors.line, false);
           if (liveSet.has(node.nodeKey) && liveSet.has(child.nodeKey)) {
-            this.appendTreePath(svg, d, true);
+            this.appendTreePath(svg, d, childMeta.colors.lineActive, true);
           }
           continue;
         }
@@ -1755,24 +2038,25 @@
         const radius = Math.max(4, Math.min(8, horizontalGap - 1));
         const trunkTop = parentMeta.y + radius;
         const trunkBottom = childMetas[childMetas.length - 1].y - radius;
+        const branchColors = childMetas[0].colors;
 
-        this.appendTreePath(svg, this.buildBranchOutPath(parentMeta.x, parentMeta.y, trunkX, radius), false);
+        this.appendTreePath(svg, this.buildBranchOutPath(parentMeta.x, parentMeta.y, trunkX, radius), branchColors.line, false);
         if (trunkBottom > trunkTop) {
-          this.appendTreePath(svg, `M ${trunkX} ${trunkTop} L ${trunkX} ${trunkBottom}`, false);
+          this.appendTreePath(svg, `M ${trunkX} ${trunkTop} L ${trunkX} ${trunkBottom}`, branchColors.line, false);
         }
 
         for (const childMeta of childMetas) {
-          this.appendTreePath(svg, this.buildBranchInPath(trunkX, childMeta.x, childMeta.y, radius), false);
+          this.appendTreePath(svg, this.buildBranchInPath(trunkX, childMeta.x, childMeta.y, radius), childMeta.colors.line, false);
         }
 
         const activeChild = childMetas.find(childMeta => liveSet.has(node.nodeKey) && liveSet.has(childMeta.child.nodeKey));
         if (activeChild) {
-          this.appendTreePath(svg, this.buildBranchOutPath(parentMeta.x, parentMeta.y, trunkX, radius), true);
+          this.appendTreePath(svg, this.buildBranchOutPath(parentMeta.x, parentMeta.y, trunkX, radius), activeChild.colors.lineActive, true);
           const activeBottom = activeChild.y - radius;
           if (activeBottom > trunkTop) {
-            this.appendTreePath(svg, `M ${trunkX} ${trunkTop} L ${trunkX} ${activeBottom}`, true);
+            this.appendTreePath(svg, `M ${trunkX} ${trunkTop} L ${trunkX} ${activeBottom}`, activeChild.colors.lineActive, true);
           }
-          this.appendTreePath(svg, this.buildBranchInPath(trunkX, activeChild.x, activeChild.y, radius), true);
+          this.appendTreePath(svg, this.buildBranchInPath(trunkX, activeChild.x, activeChild.y, radius), activeChild.colors.lineActive, true);
         }
       }
 
@@ -1864,6 +2148,7 @@
       this.list.textContent = "";
 
       const order = this.computeRenderOrder();
+      const branchColorScale = this.buildBranchColorScale(order);
       const fragment = document.createDocumentFragment();
       const liveSet = new Set(this.livePathKeys);
 
@@ -1884,6 +2169,7 @@
       for (const { node, branchDepth } of order) {
         const isActive = liveSet.has(node.nodeKey);
         const isCurrent = node.nodeKey === this.activeNodeKey;
+        const branchColors = branchColorScale.get(branchDepth) || branchColorScale.get(0);
 
         const row = document.createElement("div");
         row.className = "cghl-row";
@@ -1891,6 +2177,12 @@
         if (isActive) row.dataset.active = "";
         if (isCurrent) row.dataset.current = "";
         row.style.setProperty("--cghl-indent-px", `${branchDepth * 20}px`);
+        row.style.setProperty("--cghl-branch-dot-fill", branchColors.dotFill);
+        row.style.setProperty("--cghl-branch-dot-stroke", branchColors.dotStroke);
+        row.style.setProperty("--cghl-branch-dot-active", branchColors.dotActive);
+        row.style.setProperty("--cghl-branch-dot-current", branchColors.dotCurrent);
+        row.style.setProperty("--cghl-branch-glow", branchColors.glow);
+        row.style.setProperty("--cghl-branch-active-glow", branchColors.activeGlow);
 
         // ── Indent guides ──
         const indent = document.createElement("div");
@@ -1943,7 +2235,7 @@
 
       fragment.appendChild(tree);
       this.list.appendChild(fragment);
-      this.renderTreeConnections(tree, order, rowRefs, liveSet);
+      this.renderTreeConnections(tree, order, rowRefs, liveSet, branchColorScale);
       this.updateCounts(this.treeNodes.size);
     }
 
